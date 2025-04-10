@@ -19,6 +19,7 @@ yarn-error.log*
 
 # env files
 .env*
+/server/src/engine/stockfish/stockfish-windows-x86-64-avx2.exe
 
 # vercel
 .vercel
