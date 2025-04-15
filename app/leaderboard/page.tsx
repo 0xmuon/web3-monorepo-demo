@@ -1,10 +1,11 @@
 "use client"
 
-import { useEffect, useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useState, useEffect } from "react"
 import { Navbar } from "@/components/navbar"
 import Footer from "@/components/footer"
+import { useWallet } from "@solana/wallet-adapter-react"
+import { toast } from "react-hot-toast"
+import { LoadingState } from "@/components/ui/loading-state"
 
 interface Agent {
   id: string;
@@ -15,84 +16,114 @@ interface Agent {
   draws: number;
   points: number;
   rank: number;
+  walletAddress?: string;
 }
 
 export default function LeaderboardPage() {
-  const [agents, setAgents] = useState<Agent[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { publicKey } = useWallet()
+  const [agents, setAgents] = useState<Agent[]>([])
+  const [loading, setLoading] = useState(true)
+
+  const fetchLeaderboard = async () => {
+    try {
+      setLoading(true)
+      const response = await fetch('/api/competitions/leaderboard')
+      if (!response.ok) {
+        throw new Error('Failed to fetch leaderboard')
+      }
+      const data = await response.json()
+      // Ensure all agents have required fields with default values
+      const processedData = data.map((agent: Agent) => ({
+        ...agent,
+        name: agent.name || 'Anonymous',
+        owner: agent.owner || 'Unknown',
+        wins: agent.wins || 0,
+        losses: agent.losses || 0,
+        draws: agent.draws || 0,
+        points: agent.points || 0
+      }))
+      setAgents(processedData)
+    } catch (error) {
+      console.error('Error fetching leaderboard:', error)
+      toast.error('Failed to fetch leaderboard')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
-    const fetchLeaderboard = async () => {
-      try {
-        const response = await fetch('/api/competitions/leaderboard');
-        if (!response.ok) throw new Error('Failed to fetch leaderboard');
-        const data = await response.json();
-        // Ensure all agents have a name, defaulting to 'Anonymous' if missing
-        const processedData = data.map((agent: Agent) => ({
-          ...agent,
-          name: agent.name || 'Anonymous'
-        }));
-        setAgents(processedData);
-      } catch (error) {
-        console.error('Error fetching leaderboard:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
+    fetchLeaderboard()
+  }, []) // Only fetch once when component mounts
 
-    fetchLeaderboard();
-    const interval = setInterval(fetchLeaderboard, 5000); // Refresh every 5 seconds
-    return () => clearInterval(interval);
-  }, []);
+  const formatWalletAddress = (address: string) => {
+    if (!address || address === 'Unknown') return 'Unknown'
+    return `${address.slice(0, 6)}...${address.slice(-4)}`
+  }
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <Navbar />
       <main className="flex-grow">
         <div className="container mx-auto py-8">
-          <Card>
-            <CardHeader>
-              <CardTitle>Global Leaderboard</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Rank</TableHead>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Owner</TableHead>
-                    <TableHead className="text-right">Points</TableHead>
-                    <TableHead className="text-right">Wins</TableHead>
-                    <TableHead className="text-right">Draws</TableHead>
-                    <TableHead className="text-right">Losses</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {loading ? (
-                    <TableRow>
-                      <TableCell colSpan={7} className="text-center">Loading...</TableCell>
-                    </TableRow>
-                  ) : agents.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={7} className="text-center">No agents found</TableCell>
-                    </TableRow>
-                  ) : (
-                    agents.map((agent) => (
-                      <TableRow key={agent.id}>
-                        <TableCell>#{agent.rank}</TableCell>
-                        <TableCell>{agent.name}</TableCell>
-                        <TableCell>{agent.owner}</TableCell>
-                        <TableCell className="text-right font-bold text-blue-600">{agent.points || 0}</TableCell>
-                        <TableCell className="text-right text-green-600">{agent.wins || 0}</TableCell>
-                        <TableCell className="text-right text-yellow-600">{agent.draws || 0}</TableCell>
-                        <TableCell className="text-right text-red-600">{agent.losses || 0}</TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-2xl font-bold">Global Leaderboard</h2>
+              <button
+                onClick={fetchLeaderboard}
+                className="px-3 py-1 text-sm bg-blue-100 text-blue-600 rounded-md hover:bg-blue-200 transition-colors"
+              >
+                Refresh
+              </button>
+            </div>
+            <div className="overflow-x-auto">
+              {loading ? (
+                <div className="flex justify-center items-center py-8">
+                  <LoadingState />
+                </div>
+              ) : agents.length > 0 ? (
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">Rank</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">Agent</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">Owner</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">Points</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">Wins</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">Draws</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">Losses</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {agents.map((agent, index) => (
+                      <tr 
+                        key={agent.id} 
+                        className={publicKey && agent.owner === publicKey.toString() ? 'bg-blue-50' : ''}
+                      >
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-black">{index + 1}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-black">
+                          {agent.name}
+                          {publicKey && agent.owner === publicKey.toString() && (
+                            <span className="ml-2 px-2 py-0.5 text-xs bg-blue-100 text-blue-600 rounded-full">You</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-black">
+                          {formatWalletAddress(agent.owner)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-black">{agent.points}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-medium">{agent.wins}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-yellow-600 font-medium">{agent.draws}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-red-600 font-medium">{agent.losses}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  No agents found in the leaderboard
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </main>
       <Footer />

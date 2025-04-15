@@ -70,6 +70,36 @@ interface MatchStatus {
 const MatchResultDisplay = ({ status, result, engineOutput, message }: MatchStatus) => {
   if (status === 'idle') return null;
 
+  // Parse Stockfish output to extract key information
+  const parseStockfishOutput = (output: string | undefined) => {
+    if (!output) return null;
+    
+    // Extract the latest evaluation
+    const evalLines = output.split('\n').filter(line => line.includes('info depth') && line.includes('score'));
+    const latestEval = evalLines.length > 0 ? evalLines[evalLines.length - 1] : null;
+    
+    // Extract the best move
+    const bestMoveLine = output.split('\n').find(line => line.includes('bestmove'));
+    const bestMove = bestMoveLine ? bestMoveLine.split(' ')[1] : null;
+    
+    // Extract the principal variation
+    const pvLine = output.split('\n').find(line => line.includes('pv'));
+    const pv = pvLine ? pvLine.split('pv ')[1].split(' ').slice(0, 10) : null;
+    
+    // Extract the current position
+    const positionLines = output.split('\n').filter(line => line.includes('Position:'));
+    const currentPosition = positionLines.length > 0 ? positionLines[positionLines.length - 1].split('Position: ')[1] : null;
+    
+    return {
+      latestEval,
+      bestMove,
+      pv,
+      currentPosition
+    };
+  };
+  
+  const stockfishInfo = parseStockfishOutput(engineOutput);
+
   return (
     <div className="bg-white rounded-lg shadow-md p-6 mb-6">
       <h3 className="text-xl font-semibold mb-4">Match Status</h3>
@@ -77,7 +107,7 @@ const MatchResultDisplay = ({ status, result, engineOutput, message }: MatchStat
       {status === 'running' && (
         <div className="flex items-center space-x-3">
           <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500"></div>
-          <p className="text-gray-700">{message}</p>
+          <p className="text-black">{message}</p>
         </div>
       )}
       
@@ -102,24 +132,69 @@ const MatchResultDisplay = ({ status, result, engineOutput, message }: MatchStat
 
           {engineOutput && (
             <div className="mt-4">
-              <h4 className="font-medium mb-2">Engine Output:</h4>
-              <pre className="bg-gray-50 p-3 rounded text-sm overflow-x-auto">
-                {engineOutput}
-              </pre>
+              <h4 className="font-medium mb-2">Engine Analysis:</h4>
+              <div className="bg-gray-50 p-3 rounded text-sm overflow-x-auto">
+                <pre className="whitespace-pre-wrap text-black">{engineOutput}</pre>
+              </div>
+              
+              {stockfishInfo && (
+                <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {stockfishInfo.latestEval && (
+                    <div className="bg-blue-50 p-3 rounded">
+                      <h5 className="font-medium text-black">Latest Evaluation</h5>
+                      <p className="text-sm text-black">{stockfishInfo.latestEval}</p>
+                    </div>
+                  )}
+                  
+                  {stockfishInfo.bestMove && (
+                    <div className="bg-green-50 p-3 rounded">
+                      <h5 className="font-medium text-black">Best Move</h5>
+                      <p className="text-sm font-mono text-black">{stockfishInfo.bestMove}</p>
+                    </div>
+                  )}
+                  
+                  {stockfishInfo.pv && (
+                    <div className="bg-purple-50 p-3 rounded">
+                      <h5 className="font-medium text-black">Principal Variation</h5>
+                      <p className="text-sm font-mono text-black">{stockfishInfo.pv.join(' ')}</p>
+                    </div>
+                  )}
+                  
+                  {stockfishInfo.currentPosition && (
+                    <div className="bg-yellow-50 p-3 rounded">
+                      <h5 className="font-medium text-black">Current Position</h5>
+                      <p className="text-sm font-mono text-black">{stockfishInfo.currentPosition}</p>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
           
-          {result.moves && result.moves.length > 0 && (
+          {result?.moves && result.moves.length > 0 && (
             <div>
               <h4 className="font-medium mb-2">Match Moves:</h4>
               <div className="bg-gray-50 p-3 rounded max-h-60 overflow-y-auto">
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  {result.moves.map((move, index) => (
-                    <div key={index} className="flex">
-                      <span className="font-mono w-8 text-gray-500">{index + 1}.</span>
-                      <span className="font-mono">{move}</span>
-                    </div>
-                  ))}
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  {result.moves && Array.from({ length: Math.ceil(result.moves.length / 2) }).map((_, i) => {
+                    const moves = result.moves as string[];
+                    const whiteMove = moves[i * 2];
+                    const blackMove = moves[i * 2 + 1];
+                    return (
+                      <div key={i} className="flex items-center space-x-2">
+                        <span className="font-mono w-8 text-black">{i + 1}.</span>
+                        <div className="flex space-x-4">
+                          <span className="font-mono w-12 text-black">{whiteMove}</span>
+                          {blackMove && (
+                            <span className="font-mono w-12 text-black">{blackMove}</span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="mt-2 text-xs text-black">
+                  Total moves: {result.moves.length}
                 </div>
               </div>
             </div>
@@ -185,6 +260,7 @@ export default function ChessCompetition() {
   useEffect(() => {
     if (publicKey) {
       fetchUserData();
+      fetchLeaderboard(); // Fetch leaderboard when component mounts
     } else {
       setIsLoading(false);
     }
@@ -192,14 +268,28 @@ export default function ChessCompetition() {
 
   const fetchLeaderboard = async () => {
     try {
-      // Use the Next.js API route instead of direct backend call
+      setIsLoading(true);
       const response = await fetch('/api/chess/leaderboard');
+      if (!response.ok) {
+        throw new Error('Failed to fetch leaderboard');
+      }
       const data = await response.json();
+      console.log('Leaderboard data:', data);
       setLeaderboard(data);
     } catch (error) {
       console.error('Failed to fetch leaderboard:', error);
+      toast.error('Failed to fetch leaderboard');
+    } finally {
+      setIsLoading(false);
     }
   };
+
+  // Refresh leaderboard after match completion
+  useEffect(() => {
+    if (matchStatus.status === 'completed') {
+      fetchLeaderboard();
+    }
+  }, [matchStatus.status]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -285,43 +375,39 @@ export default function ChessCompetition() {
       // Start polling for match status
       let pollCount = 0;
       const maxPolls = 150; // 5 minutes at 2-second intervals
-      const pollInterval = 2000; // 2 seconds
+      const pollInterval = 2000;
       
       const pollMatchStatus = async () => {
         try {
           console.log(`Polling match status (attempt ${pollCount + 1}/${maxPolls})`);
-          const resultResponse = await fetch('/api/chess/match');
+          
+          // Use the matchId from the initial match response
+          if (!matchData.matchId) {
+            throw new Error('No match ID available');
+          }
+          
+          const resultResponse = await fetch(`/api/chess/match?matchId=${matchData.matchId}`);
           const resultData = await resultResponse.json();
           
           console.log('Match status update:', resultData);
           
-          if (resultData.status === 'completed') {
-            setMatchStatus({
-              status: 'completed',
-              message: 'Match completed',
-              result: {
-                winner: resultData.result.winner,
-                reason: resultData.result.reason,
-                moves: resultData.result.moves
-              },
-              engineOutput: resultData.engineOutput
-            });
-            return true; // Stop polling
-          } else if (resultData.status === 'error') {
+          if (!resultResponse.ok || resultData.status === 'error') {
             setMatchStatus({
               status: 'error',
               message: resultData.message || 'An error occurred during the match'
             });
             return true; // Stop polling
-          } else {
-            setMatchStatus({
-              status: 'running',
-              message: resultData.message || 'Match in progress...',
-              result: resultData.result,
-              engineOutput: resultData.engineOutput
-            });
-            return false; // Continue polling
           }
+          
+          setMatchStatus({
+            status: resultData.status,
+            message: resultData.message,
+            result: resultData.result,
+            engineOutput: resultData.engineOutput
+          });
+          
+          return resultData.status === 'completed'; // Stop polling if match is completed
+          
         } catch (error) {
           console.error('Error polling match status:', error);
           pollCount++;
@@ -416,43 +502,39 @@ export default function ChessCompetition() {
       // Start polling for match status
       let pollCount = 0;
       const maxPolls = 150; // 5 minutes at 2-second intervals
-      const pollInterval = 2000; // 2 seconds
+      const pollInterval = 2000;
       
       const pollMatchStatus = async () => {
         try {
           console.log(`Polling match status (attempt ${pollCount + 1}/${maxPolls})`);
-          const resultResponse = await fetch('/api/chess/match');
+          
+          // Use the matchId from the initial match response
+          if (!matchData.matchId) {
+            throw new Error('No match ID available');
+          }
+          
+          const resultResponse = await fetch(`/api/chess/match?matchId=${matchData.matchId}`);
           const resultData = await resultResponse.json();
           
           console.log('Match status update:', resultData);
           
-          if (resultData.status === 'completed') {
-            setMatchStatus({
-              status: 'completed',
-              message: 'Match completed',
-              result: {
-                winner: resultData.result.winner,
-                reason: resultData.result.reason,
-                moves: resultData.result.moves
-              },
-              engineOutput: resultData.engineOutput
-            });
-            return true; // Stop polling
-          } else if (resultData.status === 'error') {
+          if (!resultResponse.ok || resultData.status === 'error') {
             setMatchStatus({
               status: 'error',
               message: resultData.message || 'An error occurred during the match'
             });
             return true; // Stop polling
-          } else {
-            setMatchStatus({
-              status: 'running',
-              message: resultData.message || 'Match in progress...',
-              result: resultData.result,
-              engineOutput: resultData.engineOutput
-            });
-            return false; // Continue polling
           }
+          
+          setMatchStatus({
+            status: resultData.status,
+            message: resultData.message,
+            result: resultData.result,
+            engineOutput: resultData.engineOutput
+          });
+          
+          return resultData.status === 'completed'; // Stop polling if match is completed
+          
         } catch (error) {
           console.error('Error polling match status:', error);
           pollCount++;
@@ -543,7 +625,7 @@ export default function ChessCompetition() {
                           strokeLinejoin="round"
                         />
                       </svg>
-                      <div className="flex text-sm text-gray-600">
+                      <div className="flex text-sm text-black">
                         <label className="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500">
                           <span>Upload a file</span>
                           <input
@@ -553,9 +635,9 @@ export default function ChessCompetition() {
                             onChange={handleFileChange}
                           />
                         </label>
-                        <p className="pl-1">or drag and drop</p>
+                        <p className="pl-1 text-black">or drag and drop</p>
                       </div>
-                      <p className="text-xs text-gray-500">
+                      <p className="text-xs text-black">
                         C++ files only (.cpp)
                       </p>
                     </div>
@@ -654,34 +736,59 @@ export default function ChessCompetition() {
 
         {/* Local Leaderboard */}
         <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-2xl font-bold mb-4">Local Leaderboard</h2>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-2xl font-bold">Local Leaderboard</h2>
+            <button
+              onClick={fetchLeaderboard}
+              className="px-3 py-1 text-sm bg-blue-100 text-blue-600 rounded-md hover:bg-blue-200 transition-colors"
+            >
+              Refresh
+            </button>
+          </div>
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rank</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Agent</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Owner</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Points</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Wins</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Draws</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Losses</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {leaderboard.map((agent, index) => (
-                  <tr key={agent.id}>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{index + 1}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{agent.name}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{agent.owner}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600">{agent.points}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600">{agent.wins}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-yellow-600">{agent.draws}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-red-600">{agent.losses}</td>
+            {isLoading ? (
+              <div className="flex justify-center items-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+              </div>
+            ) : leaderboard.length > 0 ? (
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">Rank</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">Agent</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">Owner</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">Points</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">Wins</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">Draws</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">Losses</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {leaderboard.map((agent, index) => (
+                    <tr key={agent.id} className={publicKey && agent.owner === publicKey.toString() ? 'bg-blue-50' : ''}>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-black">{index + 1}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-black">
+                        {agent.name || 'Anonymous'}
+                        {publicKey && agent.owner === publicKey.toString() && (
+                          <span className="ml-2 px-2 py-0.5 text-xs bg-blue-100 text-blue-600 rounded-full">You</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-black">
+                        {agent.owner.slice(0, 6)}...{agent.owner.slice(-4)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-black">{agent.points}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-medium">{agent.wins}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-yellow-600 font-medium">{agent.draws}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-red-600 font-medium">{agent.losses}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                No agents found in the leaderboard
+              </div>
+            )}
           </div>
         </div>
       </main>
