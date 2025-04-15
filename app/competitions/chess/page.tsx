@@ -197,8 +197,8 @@ const MatchResultDisplay = ({ status, result, engineOutput, message }: MatchStat
                   Total moves: {result.moves.length}
                 </div>
               </div>
-            </div>
-          )}
+        </div>
+      )}
         </div>
       )}
       
@@ -412,7 +412,7 @@ export default function ChessCompetition() {
           console.error('Error polling match status:', error);
           pollCount++;
           if (pollCount >= maxPolls) {
-            setMatchStatus({
+      setMatchStatus({
               status: 'error',
               message: 'Failed to check match status. Please try again.'
             });
@@ -751,9 +751,9 @@ export default function ChessCompetition() {
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
               </div>
             ) : leaderboard.length > 0 ? (
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">Rank</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">Agent</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">Owner</th>
@@ -761,10 +761,10 @@ export default function ChessCompetition() {
                     <th className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">Wins</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">Draws</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">Losses</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {leaderboard.map((agent, index) => (
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {leaderboard.map((agent, index) => (
                     <tr key={agent.id} className={publicKey && agent.owner === publicKey.toString() ? 'bg-blue-50' : ''}>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-black">{index + 1}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-black">
@@ -780,10 +780,10 @@ export default function ChessCompetition() {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-medium">{agent.wins}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-yellow-600 font-medium">{agent.draws}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-red-600 font-medium">{agent.losses}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
             ) : (
               <div className="text-center py-8 text-gray-500">
                 No agents found in the leaderboard

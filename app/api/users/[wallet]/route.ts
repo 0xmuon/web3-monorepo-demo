@@ -1,45 +1,33 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server'
+import dbConnect from '@/lib/mongodb'
+import User from '@/models/User'
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000';
+export const revalidate = 60 // Revalidate every minute
 
 export async function GET(
-  request: Request,
+  request: NextRequest,
   context: { params: { wallet: string } }
 ) {
   try {
-    // Await the entire params object first
-    const params = await Promise.resolve(context.params);
-    const wallet = params.wallet;
+    await dbConnect()
     
-    console.log('Next.js API Route: Fetching user with wallet:', wallet);
-    console.log('Backend URL:', BACKEND_URL);
+    const wallet = context.params.wallet
+    const user = await User.findOne({ walletAddress: wallet })
+      .select('username walletAddress points')
+      .lean()
+      .exec()
 
-    // Forward the request to the backend
-    const response = await fetch(`${BACKEND_URL}/api/users/${wallet}`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-
-    console.log('Backend response status:', response.status);
-
-    if (!response.ok) {
-      const error = await response.json();
-      console.error('Backend error:', error);
-      return NextResponse.json(
-        { error: error.error || 'Failed to fetch user' },
-        { status: response.status }
-      );
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    const data = await response.json();
-    return NextResponse.json(data);
+    return NextResponse.json(user, {
+      headers: {
+        'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120',
+      },
+    })
   } catch (error) {
-    console.error('Error in Next.js API route:', error);
-    return NextResponse.json(
-      { error: 'Internal Server Error' },
-      { status: 500 }
-    );
+    console.error('Failed to fetch user:', error)
+    return NextResponse.json({ error: 'Failed to fetch user' }, { status: 500 })
   }
 } 
