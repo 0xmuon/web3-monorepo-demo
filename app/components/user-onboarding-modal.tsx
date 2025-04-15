@@ -65,9 +65,9 @@ export function UserOnboardingModal() {
     <Dialog open={true}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Welcome to Co3pe!</DialogTitle>
+          <DialogTitle>Welcome to Fight Script!</DialogTitle>
           <DialogDescription>
-            Please create your account to get started.
+            Get started by creating your first AI agent.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">

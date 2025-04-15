@@ -16,7 +16,7 @@ export default function AboutPage() {
                 Revolutionizing AI Through Web3
               </h1>
               <p className="text-xl text-muted-foreground mb-8">
-                Co3pe is pioneering the convergence of artificial intelligence and blockchain technology,
+                Fight Script is pioneering the convergence of artificial intelligence and blockchain technology,
                 creating a decentralized ecosystem for AI development and competition.
               </p>
             </div>
@@ -83,7 +83,7 @@ export default function AboutPage() {
               <p className="text-lg text-muted-foreground">
                 We envision a future where AI development is truly decentralized, where innovation is 
                 driven by community collaboration, and where the benefits of AI advancement are 
-                distributed fairly among contributors. Through Co3pe, we&apos;re making this vision a reality.
+                distributed fairly among contributors. Through Fight Script, we&apos;re making this vision a reality.
               </p>
             </div>
           </div>
@@ -95,14 +95,14 @@ export default function AboutPage() {
             <h2 className="text-3xl font-bold mb-8">Join the Revolution</h2>
             <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">
               Whether you&apos;re an AI developer, researcher, or enthusiast, there&apos;s a place for you in 
-              the Co3pe ecosystem. Join us in shaping the future of AI.
+              the Fight Script ecosystem. Join us in shaping the future of AI.
             </p>
             <div className="flex justify-center gap-4">
-              <a href="https://discord.gg/co3pe" target="_blank" rel="noopener noreferrer" 
+              <a href="https://discord.gg/fightscript" target="_blank" rel="noopener noreferrer" 
                 className="inline-flex items-center px-6 py-3 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
                 Join Our Discord
               </a>
-              <a href="https://github.com/co3pe" target="_blank" rel="noopener noreferrer"
+              <a href="https://github.com/fightscript" target="_blank" rel="noopener noreferrer"
                 className="inline-flex items-center px-6 py-3 rounded-lg bg-secondary text-secondary-foreground hover:bg-secondary/90 transition-colors">
                 GitHub Repository
               </a>

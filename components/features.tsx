@@ -2,8 +2,8 @@ import { Coins, BotIcon as Robot, Trophy, Shield } from "lucide-react"
 
 const features = [
   {
-    name: "Co3pe Token Rewards",
-    description: "Earn our native Co3pe tokens by participating in AI competitions and staking.",
+    name: "Fight Script Token Rewards",
+    description: "Earn our native Fight Script tokens by participating in AI competitions and staking.",
     icon: Coins,
   },
   {
