@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { Navbar } from "@/components/navbar"
 import Hero from "@/components/hero"
 import Features from "@/components/features"
@@ -9,11 +9,14 @@ import Footer from "@/components/footer"
 import { Suspense } from "react"
 import { LoadingState } from "@/components/ui/loading-state"
 import { useWallet } from "@solana/wallet-adapter-react"
-import { UserOnboardingModal } from "./components/user-onboarding-modal"
+import { UserOnboardingModal, UserOnboardingModalProps } from "./components/user-onboarding-modal"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import Link from "next/link"
 import { toast } from "sonner"
 import { fetchUser } from "./lib/api"
+
+// Cache user check results
+const userCheckCache = new Map<string, boolean>()
 
 export default function Home() {
   const { publicKey } = useWallet()
@@ -21,41 +24,48 @@ export default function Home() {
   const [isNewUser, setIsNewUser] = useState(false)
   const [isCheckingUser, setIsCheckingUser] = useState(false)
 
-  useEffect(() => {
-    async function checkUser() {
-      if (!publicKey || isCheckingUser) return
+  const checkUser = useCallback(async () => {
+    if (!publicKey || isCheckingUser) return
 
-      setIsCheckingUser(true)
-      try {
-        console.log('Checking user with wallet:', publicKey.toString())
-        await fetchUser(publicKey.toString())
-        // If we get here, the user exists
-        setIsNewUser(false)
-        setShowOnboarding(false)
-      } catch (error) {
-        console.error('Error checking user:', error)
-        // If the error is a 404, the user doesn't exist
-        if (error instanceof Error && error.message.includes('404')) {
-          console.log('New user detected, showing onboarding modal')
-          setIsNewUser(true)
-          setShowOnboarding(true)
-        } else {
-          toast.error("Failed to check user status")
-        }
-      } finally {
-        setIsCheckingUser(false)
-      }
+    const walletAddress = publicKey.toString()
+    
+    // Check cache first
+    const cachedIsNew = userCheckCache.get(walletAddress)
+    if (cachedIsNew !== undefined) {
+      setIsNewUser(cachedIsNew)
+      setShowOnboarding(cachedIsNew)
+      return
     }
 
-    checkUser()
+    setIsCheckingUser(true)
+    try {
+      console.log('Checking user with wallet:', walletAddress)
+      await fetchUser(walletAddress)
+      // If we get here, the user exists
+      userCheckCache.set(walletAddress, false)
+      setIsNewUser(false)
+      setShowOnboarding(false)
+    } catch (error) {
+      console.error('Error checking user:', error)
+      // If the error is a 404, the user doesn't exist
+      if (error instanceof Error && error.message.includes('404')) {
+        console.log('New user detected, showing onboarding modal')
+        userCheckCache.set(walletAddress, true)
+        setIsNewUser(true)
+        setShowOnboarding(true)
+      } else {
+        toast.error("Failed to check user status")
+      }
+    } finally {
+      setIsCheckingUser(false)
+    }
   }, [publicKey, isCheckingUser])
 
-  // Show onboarding modal immediately for new users
   useEffect(() => {
-    if (isNewUser && !showOnboarding) {
-      setShowOnboarding(true)
+    if (publicKey) {
+      checkUser()
     }
-  }, [isNewUser, showOnboarding])
+  }, [publicKey, checkUser])
 
   return (
     <div className="relative min-h-screen">
@@ -109,6 +119,10 @@ export default function Home() {
           onClose={() => {
             setShowOnboarding(false)
             setIsNewUser(false)
+            // Update cache when user completes onboarding
+            if (publicKey) {
+              userCheckCache.set(publicKey.toString(), false)
+            }
           }} 
         />
       )}

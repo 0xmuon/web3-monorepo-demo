@@ -13,7 +13,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 
-export function UserOnboardingModal() {
+export type UserOnboardingModalProps = {
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+export const UserOnboardingModal: React.FC<UserOnboardingModalProps> = ({ isOpen, onClose }) => {
   const { publicKey } = useWallet()
   const [username, setUsername] = useState("")
   const [loading, setLoading] = useState(false)
@@ -49,25 +54,24 @@ export function UserOnboardingModal() {
       })
 
       if (!response.ok) {
-        throw new Error("Failed to register user")
+        throw new Error('Failed to create user')
       }
 
-      // Refresh the page to show updated user info
-      window.location.reload()
+      onClose()
     } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred")
+      setError(err instanceof Error ? err.message : 'An error occurred')
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <Dialog open={true}>
+    <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Welcome to Fight Script!</DialogTitle>
+          <DialogTitle>Welcome to CO3PE!</DialogTitle>
           <DialogDescription>
-            Get started by creating your first AI agent.
+            Please create your account to get started.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -81,11 +85,9 @@ export function UserOnboardingModal() {
               required
             />
           </div>
-          {error && (
-            <div className="text-red-500 text-sm">{error}</div>
-          )}
+          {error && <p className="text-red-500 text-sm">{error}</p>}
           <Button type="submit" disabled={loading}>
-            {loading ? "Creating account..." : "Create Account"}
+            {loading ? "Creating..." : "Create Account"}
           </Button>
         </form>
       </DialogContent>

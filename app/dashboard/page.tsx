@@ -11,7 +11,7 @@ import { AgentsList } from "@/app/components/agents-list"
 import { ActivityFeed } from "@/app/components/activity-feed"
 import { LoadingState } from "@/app/components/ui/loading-state"
 import { Navbar } from "@/components/navbar"
-import { fetchUserStats } from "../lib/api"
+import { fetchUserStats, fetchUser } from "../lib/api"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { UserOnboardingModal } from "@/app/components/user-onboarding-modal"
 
@@ -42,30 +42,50 @@ export default function DashboardPage() {
   const [isNewUser, setIsNewUser] = useState(false)
 
   useEffect(() => {
-    async function fetchDashboardData() {
-      if (!publicKey) {
-        console.log("Wallet not connected");
-        setLoading(false);
-        return;
-      }
+    async function checkUser() {
+      if (!publicKey) return;
 
       try {
-        console.log("Fetching dashboard data for wallet:", publicKey.toString());
-        setLoading(true);
-        setError(null);
         const walletAddress = publicKey.toString();
+        console.log("Checking user with wallet:", walletAddress);
+        
+        const userData = await fetchUser(walletAddress);
+        console.log("User data:", userData);
+
+        if (!userData) {
+          setIsNewUser(true);
+          setShowOnboarding(true);
+          return;
+        }
+
+        // Fetch user stats after confirming user exists
         const statsData = await fetchUserStats(walletAddress);
-        console.log("Received stats data:", statsData);
-        setUserStats(statsData);
+        console.log("User stats:", statsData);
+        
+        setUserStats({
+          ...userData,
+          stats: statsData || {
+            totalAgents: 0,
+            competitionsWon: 0,
+            tokensEarned: 0,
+            winRate: 0,
+            totalGames: 0
+          }
+        });
       } catch (error) {
-        console.error('Error fetching dashboard data:', error);
-        setError(error instanceof Error ? error.message : 'Failed to load dashboard data. Please try again later.');
+        console.error("Error checking user:", error);
+        if (error instanceof Error && error.message.includes('404')) {
+          setIsNewUser(true);
+          setShowOnboarding(true);
+        } else {
+          setError(error instanceof Error ? error.message : 'Failed to load user data');
+        }
       } finally {
         setLoading(false);
       }
     }
 
-    fetchDashboardData();
+    checkUser();
   }, [publicKey]);
 
   useEffect(() => {
@@ -76,46 +96,29 @@ export default function DashboardPage() {
         const response = await fetch(`/api/users/${publicKey.toString()}`);
         if (!response.ok) throw new Error('Failed to fetch agent stats');
         const data = await response.json();
-        // Ensure agent has a name, defaulting to 'Anonymous' if missing
-        const processedAgent = {
-          ...data.agent,
-          name: data.agent?.name || 'Anonymous',
-          wins: data.agent?.wins || 0,
-          losses: data.agent?.losses || 0,
-          draws: data.agent?.draws || 0,
-          points: data.agent?.points || 0,
-          rank: data.agent?.rank || 0
-        };
-        setAgent(processedAgent);
+        
+        if (data.agent) {
+          setAgent({
+            ...data.agent,
+            name: data.agent.name || 'Unnamed Agent',
+            wins: data.agent.wins || 0,
+            losses: data.agent.losses || 0,
+            draws: data.agent.draws || 0,
+            points: data.agent.points || 0,
+            rank: data.agent.rank || 0
+          });
+        }
       } catch (error) {
         console.error('Error fetching agent stats:', error);
-      } finally {
-        setLoading(false);
       }
     };
 
-    fetchAgentStats();
-    const interval = setInterval(fetchAgentStats, 5000);
-    return () => clearInterval(interval);
-  }, [publicKey]);
-
-  useEffect(() => {
-    async function checkUser() {
-      if (!publicKey) return
-
-      try {
-        const response = await fetch(`/api/users/${publicKey.toString()}`)
-        if (response.status === 404) {
-          setIsNewUser(true)
-          setShowOnboarding(true)
-        }
-      } catch (error) {
-        console.error("Error checking user:", error)
-      }
+    if (userStats) {
+      fetchAgentStats();
+      const interval = setInterval(fetchAgentStats, 5000);
+      return () => clearInterval(interval);
     }
-
-    checkUser()
-  }, [publicKey])
+  }, [publicKey, userStats]);
 
   if (!publicKey) {
     return (
@@ -178,7 +181,7 @@ export default function DashboardPage() {
                     <CardTitle>Total Agents</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">{userStats?.stats.totalAgents || 0}</div>
+                    <div className="text-2xl font-bold">{userStats?.stats?.totalAgents ?? 0}</div>
                     <Bot className="h-4 w-4 text-muted-foreground" />
                   </CardContent>
                 </Card>
@@ -188,7 +191,7 @@ export default function DashboardPage() {
                     <CardTitle>Competitions Won</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">{userStats?.stats.competitionsWon || 0}</div>
+                    <div className="text-2xl font-bold">{userStats?.stats?.competitionsWon ?? 0}</div>
                     <Trophy className="h-4 w-4 text-muted-foreground" />
                   </CardContent>
                 </Card>
@@ -198,7 +201,7 @@ export default function DashboardPage() {
                     <CardTitle>Tokens Earned</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">{userStats?.stats.tokensEarned || 0}</div>
+                    <div className="text-2xl font-bold">{userStats?.stats?.tokensEarned ?? 0}</div>
                     <Coins className="h-4 w-4 text-muted-foreground" />
                   </CardContent>
                 </Card>
@@ -208,7 +211,7 @@ export default function DashboardPage() {
                     <CardTitle>Win Rate</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">{userStats?.stats.winRate || 0}%</div>
+                    <div className="text-2xl font-bold">{userStats?.stats?.winRate ?? 0}%</div>
                     <History className="h-4 w-4 text-muted-foreground" />
                   </CardContent>
                 </Card>
@@ -285,7 +288,12 @@ export default function DashboardPage() {
           </Tabs>
         </div>
       </div>
-      {showOnboarding && isNewUser && <UserOnboardingModal />}
+      {showOnboarding && isNewUser && (
+        <UserOnboardingModal 
+          isOpen={showOnboarding && isNewUser}
+          onClose={() => setShowOnboarding(false)}
+        />
+      )}
     </div>
   );
 }

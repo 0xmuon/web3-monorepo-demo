@@ -4,12 +4,13 @@ import "./globals.css"
 import { Navbar } from "@/components/navbar"
 import { Providers } from "@/components/providers"
 import { Toaster } from 'react-hot-toast'
+import { AppWalletProvider } from '@/components/app-wallet-provider'
 
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "Fight Script",
-  description: "AI Competition Platform",
+  title: "CO3PE",
+  description: "AI Chess Competition Platform",
 }
 
 export default function RootLayout({
@@ -20,14 +21,16 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
-        <Providers>
-          <div className="min-h-screen flex flex-col">
-            
-            <main className="flex-1">
-              {children}
-            </main>
-          </div>
-        </Providers>
+        <AppWalletProvider>
+          <Providers>
+            <div className="min-h-screen flex flex-col">
+              
+              <main className="flex-1">
+                {children}
+              </main>
+            </div>
+          </Providers>
+        </AppWalletProvider>
         <Toaster position="bottom-right" />
       </body>
     </html>

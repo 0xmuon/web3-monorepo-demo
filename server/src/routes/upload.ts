@@ -40,16 +40,26 @@ const upload = multer({
 });
 
 // Google Drive API setup
-const keyFilePath = path.join(process.cwd(), '..', 'public', 'co3pe-453808-0e053faf0259.json');
-console.log('Google Drive key file path:', keyFilePath);
+const credentials = {
+  type: process.env.GOOGLE_DRIVE_TYPE,
+  project_id: process.env.GOOGLE_DRIVE_PROJECT_ID,
+  private_key_id: process.env.GOOGLE_DRIVE_PRIVATE_KEY_ID,
+  private_key: process.env.GOOGLE_DRIVE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+  client_email: process.env.GOOGLE_DRIVE_CLIENT_EMAIL,
+  client_id: process.env.GOOGLE_DRIVE_CLIENT_ID,
+  auth_uri: process.env.GOOGLE_DRIVE_AUTH_URI,
+  token_uri: process.env.GOOGLE_DRIVE_TOKEN_URI,
+  auth_provider_x509_cert_url: process.env.GOOGLE_DRIVE_AUTH_PROVIDER_CERT_URL,
+  client_x509_cert_url: process.env.GOOGLE_DRIVE_CLIENT_CERT_URL
+};
 
-if (!fs.existsSync(keyFilePath)) {
-  console.error('Google Drive credentials file not found at:', keyFilePath);
-  throw new Error('Google Drive credentials file not found');
+if (!credentials.private_key || !credentials.client_email) {
+  console.error('Google Drive credentials not found in environment variables');
+  throw new Error('Google Drive credentials not configured');
 }
 
 const auth = new GoogleAuth({
-  keyFile: keyFilePath,
+  credentials,
   scopes: ['https://www.googleapis.com/auth/drive.file']
 });
 

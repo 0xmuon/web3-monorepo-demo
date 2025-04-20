@@ -23,8 +23,7 @@ yarn-error.log*
 
 # vercel
 .vercel
-
-public\co3pe-453808-0e053faf0259.json
+public/*.json
 
 # typescript
 *.tsbuildinfo

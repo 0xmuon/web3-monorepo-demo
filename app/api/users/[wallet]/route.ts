@@ -6,12 +6,12 @@ export const revalidate = 60 // Revalidate every minute
 
 export async function GET(
   request: NextRequest,
-  context: { params: { wallet: string } }
+  context: { params: Promise<{ wallet: string }> }
 ) {
   try {
     await dbConnect()
     
-    const wallet = context.params.wallet
+    const { wallet } = await context.params
     const user = await User.findOne({ walletAddress: wallet })
       .select('username walletAddress points')
       .lean()
