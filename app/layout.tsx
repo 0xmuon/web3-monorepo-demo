@@ -9,7 +9,7 @@ import { AppWalletProvider } from '@/components/app-wallet-provider'
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "CO3PE",
+  title: "FightScript",
   description: "AI Chess Competition Platform",
 }
 

@@ -65,8 +65,13 @@ const requiredCredentials = [
 const missingCredentials = requiredCredentials.filter(key => !process.env[key]);
 
 if (missingCredentials.length > 0) {
-  console.error('Missing required Google Drive credentials:', missingCredentials);
-  throw new Error('Google Drive credentials not properly configured in environment variables');
+  const errorMessage = `Missing required Google Drive credentials: ${missingCredentials.join(', ')}. Please ensure all required environment variables are set.`;
+  console.error(errorMessage);
+  console.error('Current environment:', {
+    NODE_ENV: process.env.NODE_ENV,
+    PWD: process.cwd(),
+  });
+  throw new Error(errorMessage);
 }
 
 const auth = new GoogleAuth({
