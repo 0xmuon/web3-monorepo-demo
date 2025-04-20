@@ -38,14 +38,38 @@ const upload = (0, multer_1.default)({
     }
 });
 // Google Drive API setup
-const keyFilePath = path_1.default.join(process.cwd(), '..', 'public', 'co3pe-453808-0e053faf0259.json');
-console.log('Google Drive key file path:', keyFilePath);
-if (!fs_1.default.existsSync(keyFilePath)) {
-    console.error('Google Drive credentials file not found at:', keyFilePath);
-    throw new Error('Google Drive credentials file not found');
+const credentials = {
+    type: process.env.GOOGLE_DRIVE_TYPE,
+    project_id: process.env.GOOGLE_DRIVE_PROJECT_ID,
+    private_key_id: process.env.GOOGLE_DRIVE_PRIVATE_KEY_ID,
+    private_key: process.env.GOOGLE_DRIVE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+    client_email: process.env.GOOGLE_DRIVE_CLIENT_EMAIL,
+    client_id: process.env.GOOGLE_DRIVE_CLIENT_ID,
+    auth_uri: process.env.GOOGLE_DRIVE_AUTH_URI,
+    token_uri: process.env.GOOGLE_DRIVE_TOKEN_URI,
+    auth_provider_x509_cert_url: process.env.GOOGLE_DRIVE_AUTH_PROVIDER_CERT_URL,
+    client_x509_cert_url: process.env.GOOGLE_DRIVE_CLIENT_CERT_URL
+};
+// Validate required credentials
+const requiredCredentials = [
+    'GOOGLE_DRIVE_TYPE',
+    'GOOGLE_DRIVE_PROJECT_ID',
+    'GOOGLE_DRIVE_PRIVATE_KEY',
+    'GOOGLE_DRIVE_CLIENT_EMAIL',
+    'GOOGLE_DRIVE_CLIENT_ID'
+];
+const missingCredentials = requiredCredentials.filter(key => !process.env[key]);
+if (missingCredentials.length > 0) {
+    const errorMessage = `Missing required Google Drive credentials: ${missingCredentials.join(', ')}. Please ensure all required environment variables are set.`;
+    console.error(errorMessage);
+    console.error('Current environment:', {
+        NODE_ENV: process.env.NODE_ENV,
+        PWD: process.cwd(),
+    });
+    throw new Error(errorMessage);
 }
 const auth = new google_auth_library_1.GoogleAuth({
-    keyFile: keyFilePath,
+    credentials,
     scopes: ['https://www.googleapis.com/auth/drive.file']
 });
 const drive = googleapis_1.google.drive({
@@ -81,19 +105,10 @@ router.post("/agent", upload.single("file"), async (req, res) => {
         });
     }
     catch (error) {
-        console.error('Upload error:', {
-            message: error.message,
-            stack: error.stack,
-            code: error.code
-        });
-        // Clean up the file in case of error
-        if (req.file && fs_1.default.existsSync(req.file.path)) {
-            fs_1.default.unlinkSync(req.file.path);
-        }
+        console.error('Error processing upload:', error);
         res.status(500).json({
-            error: 'Upload failed',
-            details: error.message,
-            code: error.code
+            error: 'Failed to process upload',
+            details: error instanceof Error ? error.message : 'Unknown error'
         });
     }
 });

@@ -296,31 +296,6 @@ async function downloadFromDrive(fileId, dest) {
         throw new Error(`Failed to download file from Drive: ${error}`);
     }
 }
-// GET /api/chess/match/:id/status
-router.get('/match/:id/status', async (req, res) => {
-    try {
-        const { id } = req.params;
-        const match = matches.get(id);
-        if (!match) {
-            return res.status(404).json({
-                error: 'Match not found'
-            });
-        }
-        res.json({
-            status: match.status,
-            message: match.message,
-            winner: match.winner,
-            moves: match.moves
-        });
-    }
-    catch (error) {
-        console.error('Failed to get match status:', error);
-        res.status(500).json({
-            error: 'Failed to get match status',
-            details: error instanceof Error ? error.message : 'Unknown error'
-        });
-    }
-});
 // Get user's agents
 router.get('/agents/:wallet', async (req, res) => {
     try {
