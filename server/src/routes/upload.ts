@@ -53,9 +53,20 @@ const credentials = {
   client_x509_cert_url: process.env.GOOGLE_DRIVE_CLIENT_CERT_URL
 };
 
-if (!credentials.private_key || !credentials.client_email) {
-  console.error('Google Drive credentials not found in environment variables');
-  throw new Error('Google Drive credentials not configured');
+// Validate required credentials
+const requiredCredentials = [
+  'GOOGLE_DRIVE_TYPE',
+  'GOOGLE_DRIVE_PROJECT_ID',
+  'GOOGLE_DRIVE_PRIVATE_KEY',
+  'GOOGLE_DRIVE_CLIENT_EMAIL',
+  'GOOGLE_DRIVE_CLIENT_ID'
+];
+
+const missingCredentials = requiredCredentials.filter(key => !process.env[key]);
+
+if (missingCredentials.length > 0) {
+  console.error('Missing required Google Drive credentials:', missingCredentials);
+  throw new Error('Google Drive credentials not properly configured in environment variables');
 }
 
 const auth = new GoogleAuth({
@@ -100,22 +111,11 @@ router.post("/agent", upload.single("file"), async (req, res) => {
       message: 'File uploaded successfully',
       path: req.file.path
     });
-  } catch (error: any) {
-    console.error('Upload error:', {
-      message: error.message,
-      stack: error.stack,
-      code: error.code
-    });
-
-    // Clean up the file in case of error
-    if (req.file && fs.existsSync(req.file.path)) {
-      fs.unlinkSync(req.file.path);
-    }
-
+  } catch (error) {
+    console.error('Error processing upload:', error);
     res.status(500).json({ 
-      error: 'Upload failed',
-      details: error.message,
-      code: error.code
+      error: 'Failed to process upload',
+      details: error instanceof Error ? error.message : 'Unknown error'
     });
   }
 });
