@@ -105,6 +105,11 @@ router.post("/agent", upload.single("file"), async (req, res) => {
     return res.status(400).json({ error: "No file uploaded" });
   }
 
+  if (!req.body.wallet) {
+    console.log('No wallet address provided');
+    return res.status(400).json({ error: "Wallet address is required" });
+  }
+
   try {
     // Verify file exists after upload
     if (!fs.existsSync(req.file.path)) {
@@ -156,18 +161,7 @@ router.post("/agent", upload.single("file"), async (req, res) => {
     });
   } catch (error) {
     console.error('Error processing upload:', error);
-    
-    // Clean up the local file in case of error
-    if (req.file && fs.existsSync(req.file.path)) {
-      try {
-        fs.unlinkSync(req.file.path);
-        console.log('Cleaned up local file after error');
-      } catch (cleanupError) {
-        console.error('Failed to clean up local file after error:', cleanupError);
-      }
-    }
-
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Failed to process upload',
       details: error instanceof Error ? error.message : 'Unknown error'
     });

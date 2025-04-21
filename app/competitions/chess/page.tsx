@@ -335,18 +335,18 @@ export default function ChessCompetition() {
 
       console.log('Uploading file:', uploadState.file.name);
 
-      // Use the Next.js API route instead of direct backend call
-      const uploadResponse = await fetch('/api/upload/agent', {
+      // Use the direct backend URL
+      const uploadResponse = await fetch('https://fightscript.onrender.com/api/upload/agent', {
         method: 'POST',
         body: formData,
       });
 
-      const uploadData = await uploadResponse.json();
-
       if (!uploadResponse.ok) {
-        throw new Error(uploadData.message || uploadData.error || 'Upload failed');
+        const errorData = await uploadResponse.json();
+        throw new Error(errorData.error || errorData.message || 'Upload failed');
       }
 
+      const uploadData = await uploadResponse.json();
       console.log('Upload successful:', uploadData);
 
       setMatchStatus({
@@ -354,8 +354,8 @@ export default function ChessCompetition() {
         message: 'Starting match against aggressive bot...'
       });
 
-      // Use the Next.js API route instead of direct backend call
-      const matchResponse = await fetch('/api/chess/match', {
+      // Use the direct backend URL for match creation
+      const matchResponse = await fetch('https://fightscript.onrender.com/api/chess/match', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -366,12 +366,13 @@ export default function ChessCompetition() {
         }),
       });
 
-      const matchData = await matchResponse.json();
-
       if (!matchResponse.ok) {
-        throw new Error(matchData.message || 'Failed to start match');
+        const errorData = await matchResponse.json();
+        throw new Error(errorData.message || 'Failed to start match');
       }
 
+      const matchData = await matchResponse.json();
+      
       // Start polling for match status
       let pollCount = 0;
       const maxPolls = 150; // 5 minutes at 2-second intervals
