@@ -34,6 +34,14 @@ const storage = multer.diskStorage({
 
 const upload = multer({ 
   storage,
+  fileFilter: (req, file, cb) => {
+    // Only allow .cpp files
+    if (!file.originalname.endsWith('.cpp')) {
+      console.error('Invalid file type:', file.originalname);
+      return cb(new Error('Only .cpp files are allowed'), false);
+    }
+    cb(null, true);
+  },
   limits: {
     fileSize: 5 * 1024 * 1024 // 5MB limit
   }
@@ -105,19 +113,60 @@ router.post("/agent", upload.single("file"), async (req, res) => {
 
     console.log('File saved successfully at:', req.file.path);
 
+    // Upload to Google Drive
+    let driveResponse;
+    try {
+      driveResponse = await drive.files.create({
+        requestBody: {
+          name: req.file.filename,
+          mimeType: 'text/x-c++src',
+        },
+        media: {
+          mimeType: 'text/x-c++src',
+          body: fs.createReadStream(req.file.path),
+        },
+      });
+      console.log('File uploaded to Google Drive:', driveResponse.data);
+    } catch (error) {
+      const driveError = error as Error;
+      console.error('Google Drive upload failed:', driveError);
+      throw new Error(`Google Drive upload failed: ${driveError.message}`);
+    }
+
     // Get the file ID from the filename (without extension)
     const fileId = path.basename(req.file.filename, '.cpp');
     console.log('Generated fileId:', fileId);
+
+    // Clean up the local file
+    try {
+      fs.unlinkSync(req.file.path);
+      console.log('Local file cleaned up');
+    } catch (cleanupError) {
+      console.error('Failed to clean up local file:', cleanupError);
+      // Continue even if cleanup fails
+    }
 
     // Return the file information
     res.json({
       success: true,
       fileId,
+      driveFileId: driveResponse.data.id,
       message: 'File uploaded successfully',
-      path: req.file.path
+      name: req.file.originalname
     });
   } catch (error) {
     console.error('Error processing upload:', error);
+    
+    // Clean up the local file in case of error
+    if (req.file && fs.existsSync(req.file.path)) {
+      try {
+        fs.unlinkSync(req.file.path);
+        console.log('Cleaned up local file after error');
+      } catch (cleanupError) {
+        console.error('Failed to clean up local file after error:', cleanupError);
+      }
+    }
+
     res.status(500).json({ 
       error: 'Failed to process upload',
       details: error instanceof Error ? error.message : 'Unknown error'
