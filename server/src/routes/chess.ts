@@ -232,10 +232,12 @@ router.get('/match', async (req, res) => {
       matchId,
       status: match.status,
       message: match.message,
-      moves: match.moves?.length || 0
+      moves: match.moves?.length || 0,
+      hasEngineOutput: !!match.engineOutput
     });
 
-    res.json({
+    // Return the match status
+    const response = {
       status: match.status,
       message: match.message,
       result: match.winner ? {
@@ -244,7 +246,10 @@ router.get('/match', async (req, res) => {
         moves: match.moves
       } : undefined,
       engineOutput: match.engineOutput
-    });
+    };
+
+    console.log('Sending response:', response);
+    res.json(response);
   } catch (error) {
     console.error('Error getting match status:', error);
     res.status(500).json({
@@ -270,11 +275,16 @@ router.post('/match', async (req, res) => {
 
     // Initialize match state
     const matchId = Date.now().toString();
-    matches.set(matchId, {
+    const matchState = {
       status: 'initializing',
       message: 'Initializing chess engine...',
-      moves: []
-    });
+      moves: [],
+      engineOutput: ''
+    };
+    
+    // Store the match state
+    matches.set(matchId, matchState);
+    console.log('Match initialized with ID:', matchId);
 
     // Get the full paths for the agents
     const userAgentPath = path.join(process.cwd(), 'uploads', 'agents', `${fileId}.cpp`);
@@ -306,10 +316,12 @@ router.post('/match', async (req, res) => {
       console.log('Chess engine initialized successfully');
       
       // Update match status to running
-      const match = matches.get(matchId)!;
-      match.status = 'running';
-      match.message = 'Match in progress...';
-      console.log('Match status updated to running');
+      const match = matches.get(matchId);
+      if (match) {
+        match.status = 'running';
+        match.message = 'Match in progress...';
+        console.log('Match status updated to running');
+      }
 
       // Run the match asynchronously
       console.log('Starting match between agents...');
@@ -317,68 +329,74 @@ router.post('/match', async (req, res) => {
       console.log('Match completed with result:', result);
       
       // Update match status and database based on result
-      let points = 0;
-      if (result.winner === 1) {
-        match.status = 'completed';
-        match.winner = 'user';
-        match.message = 'Match completed. Your agent won! (+2 points)';
-        points = 2;
-      } else if (result.winner === 2) {
-        match.status = 'completed';
-        match.winner = 'bot';
-        match.message = 'Match completed. The aggressive bot won. (+0 points)';
-        points = 0;
-      } else {
-        match.status = 'completed';
-        match.winner = 'draw';
-        match.message = 'Match completed. The game ended in a draw. (+1 point)';
-        points = 1;
-      }
+      const updatedMatch = matches.get(matchId);
+      if (updatedMatch) {
+        let points = 0;
+        if (result.winner === 1) {
+          updatedMatch.status = 'completed';
+          updatedMatch.winner = 'user';
+          updatedMatch.message = 'Match completed. Your agent won! (+2 points)';
+          points = 2;
+        } else if (result.winner === 2) {
+          updatedMatch.status = 'completed';
+          updatedMatch.winner = 'bot';
+          updatedMatch.message = 'Match completed. The aggressive bot won. (+0 points)';
+          points = 0;
+        } else {
+          updatedMatch.status = 'completed';
+          updatedMatch.winner = 'draw';
+          updatedMatch.message = 'Match completed. The game ended in a draw. (+1 point)';
+          points = 1;
+        }
 
-      match.moves = result.moves;
-      console.log('Match completed successfully:', {
-        winner: match.winner,
-        reason: result.reason,
-        moves: result.moves.length
-      });
-
-      // Update or create agent in database
-      try {
-        const agent = await Agent.findOneAndUpdate(
-          { walletAddress },
-          {
-            $inc: {
-              wins: result.winner === 1 ? 1 : 0,
-              losses: result.winner === 2 ? 1 : 0,
-              draws: result.winner === 0 ? 1 : 0,
-              points: points
-            },
-            $setOnInsert: {
-              name: 'Anonymous',
-              status: 'active',
-              createdAt: new Date()
-            }
-          },
-          { upsert: true, new: true }
-        );
-
-        console.log('Agent stats updated in database:', {
-          walletAddress,
-          wins: agent.wins,
-          losses: agent.losses,
-          draws: agent.draws,
-          points: agent.points
+        updatedMatch.moves = result.moves;
+        updatedMatch.engineOutput = result.engineOutput || '';
+        console.log('Match completed successfully:', {
+          winner: updatedMatch.winner,
+          reason: result.reason,
+          moves: result.moves.length
         });
-      } catch (dbError) {
-        console.error('Failed to update agent stats:', dbError);
-        // Continue even if database update fails
+
+        // Update or create agent in database
+        try {
+          const agent = await Agent.findOneAndUpdate(
+            { walletAddress },
+            {
+              $inc: {
+                wins: result.winner === 1 ? 1 : 0,
+                losses: result.winner === 2 ? 1 : 0,
+                draws: result.winner === 0 ? 1 : 0,
+                points: points
+              },
+              $setOnInsert: {
+                name: 'Anonymous',
+                status: 'active',
+                createdAt: new Date()
+              }
+            },
+            { upsert: true, new: true }
+          );
+
+          console.log('Agent stats updated in database:', {
+            walletAddress,
+            wins: agent.wins,
+            losses: agent.losses,
+            draws: agent.draws,
+            points: agent.points
+          });
+        } catch (dbError) {
+          console.error('Failed to update agent stats:', dbError);
+          // Continue even if database update fails
+        }
       }
 
     } catch (error) {
       console.error('Match failed:', error);
-      const match = matches.get(matchId)!;
-      match.status = 'error';
-      match.message = error instanceof Error ? error.message : 'Internal server error';
+      const match = matches.get(matchId);
+      if (match) {
+        match.status = 'error';
+        match.message = error instanceof Error ? error.message : 'Internal server error';
+      }
     }
 
   } catch (error) {
