@@ -382,23 +382,21 @@ export default function ChessCompetition() {
         try {
           console.log(`Polling match status (attempt ${pollCount + 1}/${maxPolls})`);
           
-          // Use the matchId from the initial match response
-          if (!matchData.matchId) {
-            throw new Error('No match ID available');
-          }
+          // Use the direct backend URL
+          const resultResponse = await fetch(`https://fightscript.onrender.com/api/chess/match?matchId=${matchData.matchId}`);
           
-          const resultResponse = await fetch(`/api/chess/match?matchId=${matchData.matchId}`);
-          const resultData = await resultResponse.json();
-          
-          console.log('Match status update:', resultData);
-          
-          if (!resultResponse.ok || resultData.status === 'error') {
+          if (!resultResponse.ok) {
+            const errorData = await resultResponse.json();
+            console.error('Match status error:', errorData);
             setMatchStatus({
               status: 'error',
-              message: resultData.message || 'An error occurred during the match'
+              message: errorData.error || errorData.message || 'Failed to check match status'
             });
             return true; // Stop polling
           }
+          
+          const resultData = await resultResponse.json();
+          console.log('Match status update:', resultData);
           
           setMatchStatus({
             status: resultData.status,
@@ -413,7 +411,7 @@ export default function ChessCompetition() {
           console.error('Error polling match status:', error);
           pollCount++;
           if (pollCount >= maxPolls) {
-      setMatchStatus({
+            setMatchStatus({
               status: 'error',
               message: 'Failed to check match status. Please try again.'
             });

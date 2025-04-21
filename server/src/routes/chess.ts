@@ -36,6 +36,7 @@ const matches: Map<string, {
   engineProcess?: any;
   moves: string[];
   winner?: string;
+  engineOutput?: string;
 }> = new Map();
 
 // Configure Google Drive
@@ -204,32 +205,52 @@ router.get('/leaderboard', async (req, res) => {
   }
 });
 
-// GET match status
-router.get('/match/:matchId/status', async (req, res) => {
+// Get match status
+router.get('/match', async (req, res) => {
   try {
-    const { matchId } = req.params;
-    const match = matches.get(matchId);
-
-    if (!match) {
-      return res.status(404).json({
-        status: 'error',
-        message: 'Match not found'
+    const { matchId } = req.query;
+    
+    if (!matchId) {
+      console.log('No matchId provided');
+      return res.status(400).json({ 
+        error: 'Match ID is required',
+        status: 'error'
       });
     }
 
-    // Return a properly formatted JSON response
-    return res.json({
+    const match = matches.get(matchId as string);
+    
+    if (!match) {
+      console.log('Match not found:', matchId);
+      return res.status(404).json({ 
+        error: 'Match not found',
+        status: 'error'
+      });
+    }
+
+    console.log('Match status:', {
+      matchId,
       status: match.status,
       message: match.message,
-      winner: match.winner,
-      moves: match.moves || []
+      moves: match.moves?.length || 0
     });
 
+    res.json({
+      status: match.status,
+      message: match.message,
+      result: match.winner ? {
+        winner: match.winner,
+        reason: match.message,
+        moves: match.moves
+      } : undefined,
+      engineOutput: match.engineOutput
+    });
   } catch (error) {
     console.error('Error getting match status:', error);
-    return res.status(500).json({
+    res.status(500).json({
+      error: 'Failed to get match status',
       status: 'error',
-      message: error instanceof Error ? error.message : 'Internal server error'
+      details: error instanceof Error ? error.message : 'Unknown error'
     });
   }
 });
