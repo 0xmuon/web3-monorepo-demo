@@ -27,7 +27,7 @@ export default function LeaderboardPage() {
   const fetchLeaderboard = async () => {
     try {
       setLoading(true)
-      const response = await fetch('/api/competitions/leaderboard')
+      const response = await fetch('https://fightscript.onrender.com/api/chess/leaderboard')
       if (!response.ok) {
         throw new Error('Failed to fetch leaderboard')
       }
@@ -44,7 +44,7 @@ export default function LeaderboardPage() {
       }))
       setAgents(processedData)
     } catch (error) {
-      console.error('Error fetching leaderboard:', error)
+      console.error('Failed to fetch leaderboard:', error)
       toast.error('Failed to fetch leaderboard')
     } finally {
       setLoading(false)

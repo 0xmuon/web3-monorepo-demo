@@ -269,7 +269,7 @@ export default function ChessCompetition() {
   const fetchLeaderboard = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch('/api/chess/leaderboard');
+      const response = await fetch('https://fightscript.onrender.com/api/chess/leaderboard');
       if (!response.ok) {
         throw new Error('Failed to fetch leaderboard');
       }
