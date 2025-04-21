@@ -7,6 +7,7 @@ import fs from 'fs';
 import Agent from '../models/Agent';
 import { spawn } from 'child_process';
 import { chessEngine } from '../engine/chess-engine';
+import mongoose from 'mongoose';
 
 // Define a compatible File type
 type MulterFile = {
@@ -38,10 +39,40 @@ const matches: Map<string, {
 }> = new Map();
 
 // Configure Google Drive
+const credentials = {
+  type: process.env.GOOGLE_DRIVE_TYPE,
+  project_id: process.env.GOOGLE_DRIVE_PROJECT_ID,
+  private_key_id: process.env.GOOGLE_DRIVE_PRIVATE_KEY_ID,
+  private_key: process.env.GOOGLE_DRIVE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+  client_email: process.env.GOOGLE_DRIVE_CLIENT_EMAIL,
+  client_id: process.env.GOOGLE_DRIVE_CLIENT_ID,
+  auth_uri: process.env.GOOGLE_DRIVE_AUTH_URI,
+  token_uri: process.env.GOOGLE_DRIVE_TOKEN_URI,
+  auth_provider_x509_cert_url: process.env.GOOGLE_DRIVE_AUTH_PROVIDER_CERT_URL,
+  client_x509_cert_url: process.env.GOOGLE_DRIVE_CLIENT_CERT_URL
+};
+
+// Validate required credentials
+const requiredCredentials = [
+  'GOOGLE_DRIVE_TYPE',
+  'GOOGLE_DRIVE_PROJECT_ID',
+  'GOOGLE_DRIVE_PRIVATE_KEY',
+  'GOOGLE_DRIVE_CLIENT_EMAIL',
+  'GOOGLE_DRIVE_CLIENT_ID'
+];
+
+const missingCredentials = requiredCredentials.filter(key => !process.env[key]);
+
+if (missingCredentials.length > 0) {
+  console.error('Missing required Google Drive credentials:', missingCredentials);
+  throw new Error('Google Drive credentials not properly configured in environment variables');
+}
+
 const auth = new google.auth.GoogleAuth({
-  keyFile: path.join(__dirname, '../../credentials.json'),
-  scopes: ['https://www.googleapis.com/auth/drive.file'],
+  credentials,
+  scopes: ['https://www.googleapis.com/auth/drive.file']
 });
+
 const drive = google.drive({ version: 'v3', auth });
 
 // Configure multer for file uploads
@@ -137,6 +168,15 @@ router.get('/agent/:wallet', async (req, res) => {
 // Get leaderboard
 router.get('/leaderboard', async (req, res) => {
   try {
+    // Check if database is connected
+    if (!mongoose.connection.readyState) {
+      console.error('Database not connected');
+      return res.status(503).json({ 
+        error: 'Database not connected',
+        message: 'Please try again later'
+      });
+    }
+
     const agents = await Agent.find({ status: 'active' })
       .sort({ points: -1, wins: -1 }) // Sort by points first, then wins
       .limit(100) // Limit to top 100 agents
@@ -145,12 +185,12 @@ router.get('/leaderboard', async (req, res) => {
     // Add rank to each agent
     const leaderboard = agents.map((agent, index) => ({
       id: agent._id,
-      name: agent.name,
+      name: agent.name || 'Anonymous',
       owner: agent.walletAddress,
-      wins: agent.wins,
-      losses: agent.losses,
-      draws: agent.draws,
-      points: agent.points,
+      wins: agent.wins || 0,
+      losses: agent.losses || 0,
+      draws: agent.draws || 0,
+      points: agent.points || 0,
       rank: index + 1
     }));
 
