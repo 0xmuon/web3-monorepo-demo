@@ -1,4 +1,4 @@
-*.exe -text
-*.exe filter=lfs diff=lfs merge=lfs -text
-server/src/engine/agents/*.exe -text
-server/src/engine/agents/*.exe filter=lfs diff=lfs merge=lfs -text
+*.exe binary
+*.exe -text -diff -merge
+server/src/engine/agents/*.exe binary
+server/src/engine/agents/*.exe -text -diff -merge
