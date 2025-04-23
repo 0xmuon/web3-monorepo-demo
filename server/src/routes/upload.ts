@@ -38,7 +38,8 @@ const upload = multer({
     // Only allow .cpp files
     if (!file.originalname.endsWith('.cpp')) {
       console.error('Invalid file type:', file.originalname);
-      return cb(new Error('Only .cpp files are allowed'), false);
+      cb(null, false);
+      return;
     }
     cb(null, true);
   },
