@@ -266,12 +266,6 @@ export class ChessEngine {
     let bot2: any = null;
 
     try {
-      // Ensure the uploads directory exists
-      const uploadsDir = path.join(process.cwd(), 'uploads', 'agents');
-      if (!fs.existsSync(uploadsDir)) {
-        fs.mkdirSync(uploadsDir, { recursive: true });
-      }
-
       // Get absolute paths for the bots
       const bot1AbsolutePath = path.isAbsolute(bot1Path) ? bot1Path : path.join(process.cwd(), bot1Path);
       const bot2AbsolutePath = path.isAbsolute(bot2Path) ? bot2Path : path.join(process.cwd(), bot2Path);
@@ -281,7 +275,7 @@ export class ChessEngine {
         bot2: bot2AbsolutePath
       });
 
-      // Verify files exist before compilation
+      // Verify files exist
       if (!fs.existsSync(bot1AbsolutePath)) {
         throw new Error(`Bot 1 file not found at path: ${bot1AbsolutePath}`);
       }
@@ -289,33 +283,18 @@ export class ChessEngine {
         throw new Error(`Bot 2 file not found at path: ${bot2AbsolutePath}`);
       }
 
-      // Compile bots if they're C++ files
-      let bot1Executable = bot1AbsolutePath;
-      let bot2Executable = bot2AbsolutePath;
-
-      if (bot1AbsolutePath.endsWith('.cpp')) {
-        console.log('Compiling Bot 1...');
-        bot1Executable = await this.compileCppBot(bot1AbsolutePath);
-        console.log('Bot 1 compiled successfully to:', bot1Executable);
+      // Start the bots
+      if (bot1AbsolutePath.endsWith('.py')) {
+        bot1 = spawn('python', [bot1AbsolutePath]);
+      } else {
+        bot1 = spawn(bot1AbsolutePath);
       }
 
-      if (bot2AbsolutePath.endsWith('.cpp')) {
-        console.log('Compiling Bot 2...');
-        bot2Executable = await this.compileCppBot(bot2AbsolutePath);
-        console.log('Bot 2 compiled successfully to:', bot2Executable);
+      if (bot2AbsolutePath.endsWith('.py')) {
+        bot2 = spawn('python', [bot2AbsolutePath]);
+      } else {
+        bot2 = spawn(bot2AbsolutePath);
       }
-
-      // Verify executables exist
-      if (!fs.existsSync(bot1Executable)) {
-        throw new Error(`Bot 1 executable not found at path: ${bot1Executable}`);
-      }
-      if (!fs.existsSync(bot2Executable)) {
-        throw new Error(`Bot 2 executable not found at path: ${bot2Executable}`);
-      }
-
-      console.log('Starting bots...');
-      bot1 = spawn(bot1Executable, [], { stdio: ['pipe', 'pipe', 'pipe'] });
-      bot2 = spawn(bot2Executable, [], { stdio: ['pipe', 'pipe', 'pipe'] });
 
       // Initialize UCI mode for both bots
       console.log('Initializing bots...');
