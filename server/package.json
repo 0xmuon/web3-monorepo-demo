@@ -9,7 +9,8 @@
     "start:prod": "NODE_ENV=production node dist/index.js",
     "compile-bots": "cd src/engine && compile_bots.bat",
     "test-match": "npm run compile-bots && ts-node src/engine/test-match.ts",
-    "setup": "ts-node src/engine/setup.ts"
+    "setup": "ts-node src/engine/setup.ts",
+    "prebuild": "node scripts/compile-bots.js"
   },
   "dependencies": {
     "body-parser": "^1.20.2",
