@@ -40,7 +40,10 @@ export default function Home() {
     setIsCheckingUser(true)
     try {
       console.log('Checking user with wallet:', walletAddress)
-      await fetchUser(walletAddress)
+      const response = await fetch(`https://fightscript.onrender.com/api/users/${walletAddress}`)
+      if (!response.ok) {
+        throw new Error('User not found')
+      }
       // If we get here, the user exists
       userCheckCache.set(walletAddress, false)
       setIsNewUser(false)
@@ -48,7 +51,7 @@ export default function Home() {
     } catch (error) {
       console.error('Error checking user:', error)
       // If the error is a 404, the user doesn't exist
-      if (error instanceof Error && error.message.includes('404')) {
+      if (error instanceof Error && error.message.includes('not found')) {
         console.log('New user detected, showing onboarding modal')
         userCheckCache.set(walletAddress, true)
         setIsNewUser(true)

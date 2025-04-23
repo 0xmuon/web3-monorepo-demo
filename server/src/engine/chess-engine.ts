@@ -258,6 +258,7 @@ export class ChessEngine {
     winner: number;
     reason: string;
     moves: string[];
+    engineOutput?: string;
   }> {
     console.log('Starting match between:', bot1Path, 'and', bot2Path);
     

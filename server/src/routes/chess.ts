@@ -236,6 +236,22 @@ router.get('/match', async (req, res) => {
       hasEngineOutput: !!match.engineOutput
     });
 
+    if (match.status === 'completed' && match.winner !== null) {
+      const result = {
+        winner: match.winner,
+        reason: match.message,
+        moves: match.moves,
+        engineOutput: match.engineOutput
+      };
+      return res.json({
+        status: match.status,
+        message: match.message,
+        moves: match.moves,
+        result,
+        engineOutput: match.engineOutput
+      });
+    }
+
     // Return the match status
     const response = {
       status: match.status,
