@@ -1,19 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useWallet } from '@solana/wallet-adapter-react'
 import { Connection, PublicKey, Commitment, Transaction, LAMPORTS_PER_SOL, SystemProgram } from '@solana/web3.js'
-import { 
-  getMint, 
-  getAccount, 
-  getAssociatedTokenAddress, 
-  createAssociatedTokenAccountInstruction,
-  TOKEN_PROGRAM_ID as SPL_TOKEN_PROGRAM_ID,
-  Mint,
-  createTransferInstruction,
-  getOrCreateAssociatedTokenAccount,
-  Account
-} from '@solana/spl-token'
+import { Token, TOKEN_PROGRAM_ID as SPL_TOKEN_PROGRAM_ID, AccountInfo as TokenAccountInfo, MintInfo } from '@solana/spl-token'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
@@ -24,7 +14,6 @@ import { toast } from 'react-hot-toast'
 
 const MINT_ADDRESS = 'mntLuRtjrYJACzkgFksuUzzbm9wvoJzz7vyjVBZ8E6p'
 const RPC_ENDPOINT = 'https://api.devnet.solana.com'
-const TOKEN_2022_PROGRAM_ID = new PublicKey('TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb')
 
 // Add token metadata interface
 interface TokenMetadata {
@@ -33,9 +22,17 @@ interface TokenMetadata {
   isInitialized: boolean;
   freezeAuthority: string | null;
   mintAuthority: string | null;
-  name?: string;
-  symbol?: string;
-  image?: string;
+  name: string;
+  symbol: string;
+}
+
+interface TokenExtension {
+  type: string;
+  pointer: PublicKey;
+}
+
+interface ExtendedMintInfo extends MintInfo {
+  extensions?: TokenExtension[];
 }
 
 export default function StakePage() {
@@ -53,33 +50,8 @@ export default function StakePage() {
   
   const isWalletConnected = !!publicKey
 
-  // Add function to check user's devnet token balance
-  const checkUserBalance = async () => {
-    if (!publicKey) return
-
-    try {
-      const connection = new Connection(RPC_ENDPOINT, 'confirmed')
-      const userATA = await getAssociatedTokenAddress(
-        new PublicKey(MINT_ADDRESS),
-        publicKey
-      )
-
-      try {
-        const account = await getAccount(connection, userATA)
-        const balance = Number(account.amount) / Math.pow(10, (account as any).decimals)
-        setUserBalance(balance)
-      } catch (err) {
-        // If account doesn't exist, balance is 0
-        setUserBalance(0)
-      }
-    } catch (error) {
-      console.error('Error checking balance:', error)
-      setError('Failed to check token balance')
-    }
-  }
-
   // Add function to check user's SOL balance
-  const checkSolBalance = async () => {
+  const checkSolBalance = useCallback(async () => {
     if (!publicKey) return
 
     try {
@@ -90,7 +62,37 @@ export default function StakePage() {
       console.error('Error checking SOL balance:', error)
       setError('Failed to check SOL balance')
     }
-  }
+  }, [publicKey])
+
+  // Add function to check user's token balance
+  const checkUserBalance = useCallback(async () => {
+    if (!publicKey) return
+
+    try {
+      const connection = new Connection(RPC_ENDPOINT, 'confirmed')
+      const token = new Token(
+        connection,
+        new PublicKey(MINT_ADDRESS),
+        SPL_TOKEN_PROGRAM_ID,
+        {
+          publicKey,
+          secretKey: new Uint8Array(64) // This is a dummy signer since we're only reading
+        }
+      )
+
+      try {
+        const tokenAccount = await token.getOrCreateAssociatedAccountInfo(publicKey)
+        const balance = Number(tokenAccount.amount) / Math.pow(10, tokenMetadata?.decimals || 9)
+        setUserBalance(balance)
+      } catch (err) {
+        // If account doesn't exist, balance is 0
+        setUserBalance(0)
+      }
+    } catch (error) {
+      console.error('Error checking balance:', error)
+      setError('Failed to check token balance')
+    }
+  }, [publicKey, tokenMetadata?.decimals])
 
   // Add function to buy CO3PE tokens with SOL
   const handleBuyTokens = async () => {
@@ -110,13 +112,18 @@ export default function StakePage() {
         throw new Error('Insufficient SOL balance')
       }
 
-      // Get or create user's token account
-      const userATA = await getOrCreateAssociatedTokenAccount(
+      const token = new Token(
         connection,
-        publicKey,
         new PublicKey(MINT_ADDRESS),
-        publicKey
+        SPL_TOKEN_PROGRAM_ID,
+        {
+          publicKey,
+          secretKey: new Uint8Array(64) // This is a dummy signer since we're only creating instructions
+        }
       )
+
+      // Get or create token account
+      const tokenAccount = await token.getOrCreateAssociatedAccountInfo(publicKey)
 
       // Create transfer instruction for SOL
       const transferSolInstruction = SystemProgram.transfer({
@@ -125,18 +132,20 @@ export default function StakePage() {
         lamports: totalSolCost * LAMPORTS_PER_SOL
       })
 
-      // Create mint instruction for CO3PE tokens
-      const mintInstruction = createTransferInstruction(
+      // Create transfer instruction for tokens
+      const transferTokensInstruction = Token.createTransferInstruction(
+        SPL_TOKEN_PROGRAM_ID,
         new PublicKey(MINT_ADDRESS),
-        userATA.address,
+        tokenAccount.address,
         publicKey,
+        [],
         amount * Math.pow(10, tokenMetadata?.decimals || 9)
       )
 
       // Create and sign transaction
       const transaction = new Transaction()
         .add(transferSolInstruction)
-        .add(mintInstruction)
+        .add(transferTokensInstruction)
       
       const signedTx = await signTransaction(transaction)
       
@@ -156,25 +165,16 @@ export default function StakePage() {
   }
 
   useEffect(() => {
-    if (publicKey) {
-      checkUserBalance()
-      checkSolBalance()
-    }
-  }, [publicKey])
-
-  useEffect(() => {
     const fetchTokenMetadata = async () => {
       try {
         setIsLoading(true)
         setError(null)
         
-        // Validate mint address
         if (!MINT_ADDRESS) {
           throw new Error('Mint address is not configured')
         }
         console.log('Using mint address:', MINT_ADDRESS)
         
-        // Create connection with error handling
         let connection: Connection
         try {
           console.log('Connecting to Solana devnet...')
@@ -185,51 +185,38 @@ export default function StakePage() {
           console.error('Failed to connect to Solana:', err)
           throw new Error('Failed to connect to Solana network. Please check your internet connection.')
         }
-        
-        // Create PublicKey with error handling
-        let mintPublicKey: PublicKey
-        try {
-          mintPublicKey = new PublicKey(MINT_ADDRESS)
-          console.log('PublicKey created successfully')
-        } catch (err) {
-          console.error('Invalid mint address:', err)
-          throw new Error('Invalid mint address format')
+
+        // Get mint account info
+        const mintAccount = await connection.getAccountInfo(new PublicKey(MINT_ADDRESS))
+        if (!mintAccount) {
+          throw new Error('Mint account not found')
         }
-        
-        // Get token metadata with error handling and timeout
-        let mintInfo: Mint
-        try {
-          console.log('Fetching mint info...')
-          const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Request timed out')), 10000)
-          )
-          
-          // Try to get mint info using Token-2022 program
-          mintInfo = await Promise.race([
-            getMint(connection, mintPublicKey, 'confirmed', TOKEN_2022_PROGRAM_ID),
-            timeoutPromise
-          ]) as Mint
-          console.log('Mint info received:', mintInfo)
-        } catch (err) {
-          console.error('Failed to fetch mint info:', err)
-          if (err instanceof Error && err.message === 'Request timed out') {
-            throw new Error('Request timed out. Please try again.')
-          }
-          throw new Error('Failed to fetch token information. The token might not exist on devnet.')
+
+        // Parse mint data manually
+        const mintData = mintAccount.data
+        const mintInfo = {
+          decimals: 9, // We know this from the token info
+          supply: mintData.readBigUInt64LE(36).toString(), // Read supply from mint data
+          isInitialized: true,
+          freezeAuthority: new PublicKey('bosHM5afpZ9qiwfZBR5fmsgn2ajAoWkD9PNwLV8E7Zg'),
+          mintAuthority: new PublicKey('bosHM5afpZ9qiwfZBR5fmsgn2ajAoWkD9PNwLV8E7Zg'),
+          name: 'FightScript Token',
+          symbol: 'FST'
         }
-        
-        // Format the supply with proper decimals
+
         const formattedSupply = (Number(mintInfo.supply) / Math.pow(10, mintInfo.decimals)).toLocaleString()
-        console.log('Formatted supply:', formattedSupply)
-        
+
         const metadata: TokenMetadata = {
           decimals: mintInfo.decimals,
           supply: formattedSupply,
           isInitialized: mintInfo.isInitialized,
           freezeAuthority: mintInfo.freezeAuthority?.toBase58() || null,
-          mintAuthority: mintInfo.mintAuthority?.toBase58() || null
+          mintAuthority: mintInfo.mintAuthority?.toBase58() || null,
+          name: mintInfo.name,
+          symbol: mintInfo.symbol
         }
-        console.log('Setting token metadata:', metadata)
+
+        console.log('Token metadata:', metadata)
         setTokenMetadata(metadata)
       } catch (error: any) {
         console.error('Error in fetchTokenMetadata:', error)
@@ -239,8 +226,12 @@ export default function StakePage() {
       }
     }
 
-    fetchTokenMetadata()
-  }, [])
+    if (publicKey) {
+      fetchTokenMetadata()
+      checkUserBalance()
+      checkSolBalance()
+    }
+  }, [publicKey, checkUserBalance, checkSolBalance])
 
   // Calculate estimated rewards based on amount and duration
   const calculateRewards = () => {
@@ -290,7 +281,7 @@ export default function StakePage() {
 
   return (
     <div className="container max-w-4xl py-12">
-      <h1 className="mb-8 text-4xl font-bold">Buy CO3PE Tokens</h1>
+      <h1 className="mb-8 text-4xl font-bold">Buy FightScript Token</h1>
       
       {isLoading && (
         <div className="mb-8 text-center">
@@ -309,8 +300,8 @@ export default function StakePage() {
           <CardHeader>
             <div className="flex items-center gap-4">
               <div>
-                <CardTitle>CO3PE Token</CardTitle>
-                <CardDescription>Your Balance: {userBalance} CO3PE</CardDescription>
+                <CardTitle>{tokenMetadata.name}</CardTitle>
+                <CardDescription>Your Balance: {userBalance} {tokenMetadata.symbol}</CardDescription>
               </div>
             </div>
           </CardHeader>
@@ -319,7 +310,7 @@ export default function StakePage() {
               <div className="space-y-2">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Total Supply</span>
-                  <span className="font-medium">{tokenMetadata.supply} CO3PE</span>
+                  <span className="font-medium">{tokenMetadata.supply} {tokenMetadata.symbol}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Price per Token</span>

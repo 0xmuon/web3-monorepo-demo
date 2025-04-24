@@ -21,7 +21,7 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
-                <Link href="/staking" className="text-muted-foreground transition-colors hover:text-primary">
+                <Link href="/stake" className="text-muted-foreground transition-colors hover:text-primary">
                   Staking
                 </Link>
               </li>

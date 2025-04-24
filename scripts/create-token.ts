@@ -1,24 +1,30 @@
-import { 
-  Connection, 
-  Keypair, 
+import {
+  Connection,
+  Keypair,
   PublicKey,
-  SystemProgram,
+  sendAndConfirmTransaction,
   Transaction,
-  sendAndConfirmTransaction
 } from '@solana/web3.js';
-import { 
-  createMint,
-  getOrCreateAssociatedTokenAccount,
-  mintTo,
+import {
+  Token,
   TOKEN_PROGRAM_ID,
-  getMint
+  ASSOCIATED_TOKEN_PROGRAM_ID,
 } from '@solana/spl-token';
 import * as fs from 'fs';
 
 async function verifyToken(connection: Connection, mintAddress: string) {
   try {
     const mintPublicKey = new PublicKey(mintAddress);
-    const mintInfo = await getMint(connection, mintPublicKey);
+    const token = new Token(
+      connection,
+      mintPublicKey,
+      TOKEN_PROGRAM_ID,
+      {
+        publicKey: mintPublicKey,
+        secretKey: new Uint8Array(64) // This is a dummy signer since we're only reading
+      }
+    );
+    const mintInfo = await token.getMintInfo();
     console.log('Token exists!');
     console.log('Decimals:', mintInfo.decimals);
     console.log('Supply:', mintInfo.supply.toString());
@@ -45,70 +51,38 @@ async function main() {
     return;
   }
   
-  // Load or create a keypair for the payer
-  let payer: Keypair;
-  try {
-    const secretKey = JSON.parse(fs.readFileSync('payer-keypair.json', 'utf-8'));
-    payer = Keypair.fromSecretKey(new Uint8Array(secretKey));
-  } catch (e) {
-    console.log('Creating new keypair...');
-    payer = Keypair.generate();
-    fs.writeFileSync('payer-keypair.json', JSON.stringify(Array.from(payer.secretKey)));
-  }
-  
-  console.log('Payer public key:', payer.publicKey.toBase58());
-  
-  // Request airdrop if needed
-  const balance = await connection.getBalance(payer.publicKey);
-  if (balance < 1000000000) { // 1 SOL
-    console.log('Requesting airdrop...');
-    const airdropSignature = await connection.requestAirdrop(
-      payer.publicKey,
-      1000000000 // 1 SOL
-    );
-    await connection.confirmTransaction(airdropSignature);
-    console.log('Airdrop received');
-  }
-  
-  // Create mint account
-  console.log('Creating mint account...');
-  const mint = await createMint(
+  // Load the keypair from the file
+  const keypairFile = fs.readFileSync('keypair.json', 'utf-8');
+  const keypair = Keypair.fromSecretKey(new Uint8Array(JSON.parse(keypairFile)));
+
+  console.log('Creating token with keypair:', keypair.publicKey.toBase58());
+
+  // Create a new token
+  const token = await Token.createMint(
     connection,
-    payer,
-    payer.publicKey, // mint authority
-    payer.publicKey, // freeze authority
-    9 // decimals
+    keypair,
+    keypair.publicKey,
+    keypair.publicKey,
+    9, // 9 decimals
+    TOKEN_PROGRAM_ID
   );
-  
-  console.log('Mint created:', mint.toBase58());
-  
-  // Create token account
-  console.log('Creating token account...');
-  const tokenAccount = await getOrCreateAssociatedTokenAccount(
-    connection,
-    payer,
-    mint,
-    payer.publicKey
+
+  console.log('Token created:', token.publicKey.toBase58());
+
+  // Create associated token account for the creator
+  const associatedTokenAccount = await token.createAssociatedTokenAccount(keypair.publicKey);
+
+  console.log('Associated token account created:', associatedTokenAccount.toBase58());
+
+  // Mint some tokens to the creator
+  await token.mintTo(
+    associatedTokenAccount,
+    keypair,
+    [],
+    1000000000 // 1 billion tokens (with 9 decimals)
   );
-  
-  console.log('Token account created:', tokenAccount.address.toBase58());
-  
-  // Mint some tokens
-  console.log('Minting tokens...');
-  const mintAmount = 1000000000; // 1 billion tokens
-  await mintTo(
-    connection,
-    payer,
-    mint,
-    tokenAccount.address,
-    payer.publicKey,
-    mintAmount
-  );
-  
-  console.log('Tokens minted successfully!');
-  console.log('Mint address:', mint.toBase58());
-  console.log('Token account:', tokenAccount.address.toBase58());
-  console.log('Amount minted:', mintAmount);
+
+  console.log('Tokens minted successfully');
 }
 
 main().catch(console.error); 
