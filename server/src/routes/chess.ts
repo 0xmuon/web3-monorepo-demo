@@ -6,8 +6,8 @@ import path from 'path';
 import fs from 'fs';
 import Agent from '../models/Agent';
 import { spawn } from 'child_process';
-import { chessEngine } from '../engine/chess-engine';
 import mongoose from 'mongoose';
+import { v4 as uuidv4 } from 'uuid';
 
 // Define a compatible File type
 type MulterFile = {
@@ -26,18 +26,35 @@ type MulterFile = {
 type FileFilterCallback = (error: Error | null, acceptFile: boolean) => void;
 type FilenameCallback = (error: Error | null, filename: string) => void;
 
-const router = express.Router();
-const engine = new ChessEngine();
+// Define match states
+const MATCH_STATES = {
+  INITIALIZING: 'initializing',
+  RUNNING: 'running',
+  COMPLETED: 'completed',
+  ERROR: 'error'
+} as const;
 
-// Create a Map to store active matches
-const matches: Map<string, {
-  status: string;
+type MatchState = typeof MATCH_STATES[keyof typeof MATCH_STATES];
+
+interface MatchData {
+  status: MatchState;
   message: string;
   engineProcess?: any;
   moves: string[];
   winner?: string;
   engineOutput?: string;
-}> = new Map();
+  createdAt: number;
+  lastUpdated: number;
+  error?: string;
+  fileId?: string;
+  walletAddress?: string;
+}
+
+const router = express.Router();
+const engine = new ChessEngine();
+
+// Create a Map to store active matches with proper typing
+const matches: Map<string, MatchData> = new Map();
 
 // Configure Google Drive
 const credentials = {
@@ -205,25 +222,54 @@ router.get('/leaderboard', async (req, res) => {
   }
 });
 
+// Validate match state
+function isValidMatchState(state: string): state is MatchState {
+  return Object.values(MATCH_STATES).includes(state as MatchState);
+}
+
+// Validate match data
+function validateMatchData(match: MatchData): boolean {
+  return (
+    isValidMatchState(match.status) &&
+    typeof match.message === 'string' &&
+    Array.isArray(match.moves) &&
+    typeof match.createdAt === 'number' &&
+    typeof match.lastUpdated === 'number'
+  );
+}
+
+// Generate a unique match ID
+function generateMatchId(): string {
+  return uuidv4();
+}
+
 // Get match status
 router.get('/match', async (req, res) => {
   try {
     const { matchId } = req.query;
     
-    if (!matchId) {
-      console.log('No matchId provided');
+    if (!matchId || typeof matchId !== 'string') {
+      console.log('Invalid matchId provided:', matchId);
       return res.status(400).json({ 
-        error: 'Match ID is required',
+        error: 'Valid match ID is required',
         status: 'error'
       });
     }
 
-    const match = matches.get(matchId as string);
+    const match = matches.get(matchId);
     
     if (!match) {
       console.log('Match not found:', matchId);
       return res.status(404).json({ 
         error: 'Match not found',
+        status: 'error'
+      });
+    }
+
+    if (!validateMatchData(match)) {
+      console.error('Invalid match data found:', match);
+      return res.status(500).json({
+        error: 'Invalid match data',
         status: 'error'
       });
     }
@@ -236,7 +282,7 @@ router.get('/match', async (req, res) => {
       hasEngineOutput: !!match.engineOutput
     });
 
-    if (match.status === 'completed' && match.winner !== null) {
+    if (match.status === MATCH_STATES.COMPLETED && match.winner !== undefined) {
       const result = {
         winner: match.winner,
         reason: match.message,
@@ -278,24 +324,30 @@ router.get('/match', async (req, res) => {
 
 // Update the match endpoint to handle errors properly
 router.post('/match', async (req, res) => {
+  let matchId: string | null = null;
+  
   try {
     const { fileId, walletAddress } = req.body;
     console.log('Starting match with walletAddress:', walletAddress);
     
-    if (!walletAddress) {
+    if (!walletAddress || !fileId) {
       return res.status(400).json({
         status: 'error',
-        message: 'Missing walletAddress in request'
+        message: 'Missing required parameters: walletAddress and fileId'
       });
     }
 
-    // Initialize match state
-    const matchId = Date.now().toString();
-    const matchState = {
-      status: 'initializing',
+    // Initialize match state with a unique ID
+    matchId = generateMatchId();
+    const matchState: MatchData = {
+      status: MATCH_STATES.INITIALIZING,
       message: 'Initializing chess engine...',
       moves: [],
-      engineOutput: ''
+      engineOutput: '',
+      createdAt: Date.now(),
+      lastUpdated: Date.now(),
+      fileId,
+      walletAddress
     };
     
     // Store the match state
@@ -320,7 +372,7 @@ router.post('/match', async (req, res) => {
 
     // Return the matchId immediately
     res.json({ 
-      status: 'initializing',
+      status: MATCH_STATES.INITIALIZING,
       matchId,
       message: 'Match initialization started'
     });
@@ -328,45 +380,43 @@ router.post('/match', async (req, res) => {
     // Initialize the engine
     try {
       console.log('Initializing chess engine...');
-      await chessEngine.initialize();
+      await engine.initialize();
       console.log('Chess engine initialized successfully');
       
       // Update match status to running
       const match = matches.get(matchId);
       if (match) {
-        match.status = 'running';
+        match.status = MATCH_STATES.RUNNING;
         match.message = 'Match in progress...';
+        match.lastUpdated = Date.now();
         console.log('Match status updated to running');
       }
 
       // Run the match asynchronously
       console.log('Starting match between agents...');
-      const result = await chessEngine.runMatch(userAgentPath, aggressiveBotPath);
+      const result = await engine.runMatch(userAgentPath, aggressiveBotPath);
       console.log('Match completed with result:', result);
       
       // Update match status and database based on result
       const updatedMatch = matches.get(matchId);
       if (updatedMatch) {
-        let points = 0;
+        updatedMatch.status = MATCH_STATES.COMPLETED;
+        updatedMatch.lastUpdated = Date.now();
+        
         if (result.winner === 1) {
-          updatedMatch.status = 'completed';
           updatedMatch.winner = 'user';
           updatedMatch.message = 'Match completed. Your agent won! (+2 points)';
-          points = 2;
         } else if (result.winner === 2) {
-          updatedMatch.status = 'completed';
           updatedMatch.winner = 'bot';
           updatedMatch.message = 'Match completed. The aggressive bot won. (+0 points)';
-          points = 0;
         } else {
-          updatedMatch.status = 'completed';
           updatedMatch.winner = 'draw';
           updatedMatch.message = 'Match completed. The game ended in a draw. (+1 point)';
-          points = 1;
         }
-
+        
         updatedMatch.moves = result.moves;
         updatedMatch.engineOutput = result.engineOutput || '';
+        
         console.log('Match completed successfully:', {
           winner: updatedMatch.winner,
           reason: result.reason,
@@ -382,7 +432,7 @@ router.post('/match', async (req, res) => {
                 wins: result.winner === 1 ? 1 : 0,
                 losses: result.winner === 2 ? 1 : 0,
                 draws: result.winner === 0 ? 1 : 0,
-                points: points
+                points: result.winner === 1 ? 2 : result.winner === 2 ? 0 : 1
               },
               $setOnInsert: {
                 name: 'Anonymous',
@@ -405,18 +455,27 @@ router.post('/match', async (req, res) => {
           // Continue even if database update fails
         }
       }
-
     } catch (error) {
       console.error('Match failed:', error);
       const match = matches.get(matchId);
       if (match) {
-        match.status = 'error';
+        match.status = MATCH_STATES.ERROR;
         match.message = error instanceof Error ? error.message : 'Internal server error';
+        match.error = error instanceof Error ? error.message : 'Unknown error';
+        match.lastUpdated = Date.now();
       }
     }
-
   } catch (error) {
     console.error('Failed to start match:', error);
+    if (matchId) {
+      const match = matches.get(matchId);
+      if (match) {
+        match.status = MATCH_STATES.ERROR;
+        match.message = error instanceof Error ? error.message : 'Internal server error';
+        match.error = error instanceof Error ? error.message : 'Unknown error';
+        match.lastUpdated = Date.now();
+      }
+    }
     return res.status(500).json({
       status: 'error',
       message: error instanceof Error ? error.message : 'Internal server error'
@@ -464,12 +523,13 @@ router.get('/agents/:wallet', async (req, res) => {
 
 // Clean up completed matches periodically
 setInterval(() => {
+  const now = Date.now();
   for (const [id, match] of matches.entries()) {
-    if (match.status === 'completed' || match.status === 'error') {
-      // Keep matches for 1 hour before cleaning up
-      setTimeout(() => {
-        matches.delete(id);
-      }, 3600000); // 1 hour
+    // Keep matches for 2 hours before cleaning up
+    if ((match.status === MATCH_STATES.COMPLETED || match.status === MATCH_STATES.ERROR) && 
+        (now - match.lastUpdated > 7200000)) {
+      console.log('Cleaning up old match:', id);
+      matches.delete(id);
     }
   }
 }, 300000); // Check every 5 minutes

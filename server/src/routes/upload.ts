@@ -1,11 +1,8 @@
 // src/routes/upload.ts
 import express from "express";
 import multer from "multer";
-import { google } from "googleapis";
 import fs from "fs";
 import path from "path";
-import { drive_v3 } from 'googleapis';
-import { GoogleAuth } from 'google-auth-library';
 import { ChessEngine } from '../engine/chess-engine'
 
 const router = express.Router();
@@ -48,51 +45,6 @@ const upload = multer({
   }
 });
 
-// Google Drive API setup
-const credentials = {
-  type: process.env.GOOGLE_DRIVE_TYPE,
-  project_id: process.env.GOOGLE_DRIVE_PROJECT_ID,
-  private_key_id: process.env.GOOGLE_DRIVE_PRIVATE_KEY_ID,
-  private_key: process.env.GOOGLE_DRIVE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-  client_email: process.env.GOOGLE_DRIVE_CLIENT_EMAIL,
-  client_id: process.env.GOOGLE_DRIVE_CLIENT_ID,
-  auth_uri: process.env.GOOGLE_DRIVE_AUTH_URI,
-  token_uri: process.env.GOOGLE_DRIVE_TOKEN_URI,
-  auth_provider_x509_cert_url: process.env.GOOGLE_DRIVE_AUTH_PROVIDER_CERT_URL,
-  client_x509_cert_url: process.env.GOOGLE_DRIVE_CLIENT_CERT_URL
-};
-
-// Validate required credentials
-const requiredCredentials = [
-  'GOOGLE_DRIVE_TYPE',
-  'GOOGLE_DRIVE_PROJECT_ID',
-  'GOOGLE_DRIVE_PRIVATE_KEY',
-  'GOOGLE_DRIVE_CLIENT_EMAIL',
-  'GOOGLE_DRIVE_CLIENT_ID'
-];
-
-const missingCredentials = requiredCredentials.filter(key => !process.env[key]);
-
-if (missingCredentials.length > 0) {
-  const errorMessage = `Missing required Google Drive credentials: ${missingCredentials.join(', ')}. Please ensure all required environment variables are set.`;
-  console.error(errorMessage);
-  console.error('Current environment:', {
-    NODE_ENV: process.env.NODE_ENV,
-    PWD: process.cwd(),
-  });
-  throw new Error(errorMessage);
-}
-
-const auth = new GoogleAuth({
-  credentials,
-  scopes: ['https://www.googleapis.com/auth/drive.file']
-});
-
-const drive = google.drive({
-  version: 'v3',
-  auth: auth
-});
-
 // POST endpoint to handle file uploads
 router.post("/agent", upload.single("file"), async (req, res) => {
   console.log('Upload request received:', {
@@ -119,46 +71,17 @@ router.post("/agent", upload.single("file"), async (req, res) => {
 
     console.log('File saved successfully at:', req.file.path);
 
-    // Upload to Google Drive
-    let driveResponse;
-    try {
-      driveResponse = await drive.files.create({
-        requestBody: {
-          name: req.file.filename,
-          mimeType: 'text/x-c++src',
-        },
-        media: {
-          mimeType: 'text/x-c++src',
-          body: fs.createReadStream(req.file.path),
-        },
-      });
-      console.log('File uploaded to Google Drive:', driveResponse.data);
-    } catch (error) {
-      const driveError = error as Error;
-      console.error('Google Drive upload failed:', driveError);
-      throw new Error(`Google Drive upload failed: ${driveError.message}`);
-    }
-
     // Get the file ID from the filename (without extension)
     const fileId = path.basename(req.file.filename, '.cpp');
     console.log('Generated fileId:', fileId);
-
-    // Clean up the local file
-    try {
-      fs.unlinkSync(req.file.path);
-      console.log('Local file cleaned up');
-    } catch (cleanupError) {
-      console.error('Failed to clean up local file:', cleanupError);
-      // Continue even if cleanup fails
-    }
 
     // Return the file information
     res.json({
       success: true,
       fileId,
-      driveFileId: driveResponse.data.id,
       message: 'File uploaded successfully',
-      name: req.file.originalname
+      name: req.file.originalname,
+      path: req.file.path
     });
   } catch (error) {
     console.error('Error processing upload:', error);

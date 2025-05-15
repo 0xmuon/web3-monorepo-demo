@@ -6,10 +6,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 // src/routes/upload.ts
 const express_1 = __importDefault(require("express"));
 const multer_1 = __importDefault(require("multer"));
-const googleapis_1 = require("googleapis");
 const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
-const google_auth_library_1 = require("google-auth-library");
 const router = express_1.default.Router();
 // Configure multer for file uploads
 const storage = multer_1.default.diskStorage({
@@ -33,48 +31,18 @@ const storage = multer_1.default.diskStorage({
 });
 const upload = (0, multer_1.default)({
     storage,
+    fileFilter: (req, file, cb) => {
+        // Only allow .cpp files
+        if (!file.originalname.endsWith('.cpp')) {
+            console.error('Invalid file type:', file.originalname);
+            cb(null, false);
+            return;
+        }
+        cb(null, true);
+    },
     limits: {
         fileSize: 5 * 1024 * 1024 // 5MB limit
     }
-});
-// Google Drive API setup
-const credentials = {
-    type: process.env.GOOGLE_DRIVE_TYPE,
-    project_id: process.env.GOOGLE_DRIVE_PROJECT_ID,
-    private_key_id: process.env.GOOGLE_DRIVE_PRIVATE_KEY_ID,
-    private_key: process.env.GOOGLE_DRIVE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-    client_email: process.env.GOOGLE_DRIVE_CLIENT_EMAIL,
-    client_id: process.env.GOOGLE_DRIVE_CLIENT_ID,
-    auth_uri: process.env.GOOGLE_DRIVE_AUTH_URI,
-    token_uri: process.env.GOOGLE_DRIVE_TOKEN_URI,
-    auth_provider_x509_cert_url: process.env.GOOGLE_DRIVE_AUTH_PROVIDER_CERT_URL,
-    client_x509_cert_url: process.env.GOOGLE_DRIVE_CLIENT_CERT_URL
-};
-// Validate required credentials
-const requiredCredentials = [
-    'GOOGLE_DRIVE_TYPE',
-    'GOOGLE_DRIVE_PROJECT_ID',
-    'GOOGLE_DRIVE_PRIVATE_KEY',
-    'GOOGLE_DRIVE_CLIENT_EMAIL',
-    'GOOGLE_DRIVE_CLIENT_ID'
-];
-const missingCredentials = requiredCredentials.filter(key => !process.env[key]);
-if (missingCredentials.length > 0) {
-    const errorMessage = `Missing required Google Drive credentials: ${missingCredentials.join(', ')}. Please ensure all required environment variables are set.`;
-    console.error(errorMessage);
-    console.error('Current environment:', {
-        NODE_ENV: process.env.NODE_ENV,
-        PWD: process.cwd(),
-    });
-    throw new Error(errorMessage);
-}
-const auth = new google_auth_library_1.GoogleAuth({
-    credentials,
-    scopes: ['https://www.googleapis.com/auth/drive.file']
-});
-const drive = googleapis_1.google.drive({
-    version: 'v3',
-    auth: auth
 });
 // POST endpoint to handle file uploads
 router.post("/agent", upload.single("file"), async (req, res) => {
@@ -86,6 +54,10 @@ router.post("/agent", upload.single("file"), async (req, res) => {
     if (!req.file) {
         console.log('No file in request');
         return res.status(400).json({ error: "No file uploaded" });
+    }
+    if (!req.body.wallet) {
+        console.log('No wallet address provided');
+        return res.status(400).json({ error: "Wallet address is required" });
     }
     try {
         // Verify file exists after upload
@@ -101,6 +73,7 @@ router.post("/agent", upload.single("file"), async (req, res) => {
             success: true,
             fileId,
             message: 'File uploaded successfully',
+            name: req.file.originalname,
             path: req.file.path
         });
     }
