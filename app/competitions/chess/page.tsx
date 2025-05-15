@@ -3,12 +3,13 @@
 import { useState, useEffect, useCallback } from "react"
 import { useWallet } from "@solana/wallet-adapter-react"
 import { toast } from "react-hot-toast"
-import CompetitionsNavbar from "@/components/competitions-navbar"
+import { Navbar } from "@/components/navbar"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { startMatch, fetchUserStats, fetchUser } from '../../lib/api'
 import { LoadingState } from "@/components/ui/loading-state"
+import Footer from "@/components/footer"
 
 const leaderboardData = [
   { rank: 1, name: "AlphaChess", wins: 150, losses: 20 },
@@ -269,7 +270,7 @@ export default function ChessCompetition() {
   const fetchLeaderboard = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch('https://fightscript.onrender.com/api/chess/leaderboard');
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/chess/leaderboard`);
       if (!response.ok) {
         throw new Error('Failed to fetch leaderboard');
       }
@@ -336,7 +337,7 @@ export default function ChessCompetition() {
       console.log('Uploading file:', uploadState.file.name);
 
       // Use the direct backend URL
-      const uploadResponse = await fetch('https://fightscript.onrender.com/api/upload/agent', {
+      const uploadResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/upload/agent`, {
         method: 'POST',
         body: formData,
       });
@@ -355,7 +356,7 @@ export default function ChessCompetition() {
       });
 
       // Use the direct backend URL for match creation
-      const matchResponse = await fetch('https://fightscript.onrender.com/api/chess/match', {
+      const matchResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/chess/match`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -383,7 +384,7 @@ export default function ChessCompetition() {
           console.log(`Polling match status (attempt ${pollCount + 1}/${maxPolls})`);
           
           // Use the direct backend URL
-          const resultResponse = await fetch(`https://fightscript.onrender.com/api/chess/match?matchId=${matchData.matchId}`);
+          const resultResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/chess/match?matchId=${matchData.matchId}`);
           
           if (!resultResponse.ok) {
             const errorData = await resultResponse.json();
@@ -579,23 +580,19 @@ export default function ChessCompetition() {
     }
   };
 
-  return (
-    <div className="min-h-screen bg-background">
-      <CompetitionsNavbar />
+  return (    
+  <div className="flex flex-col min-h-screen bg-background">
+      {/* Background gradients */}
+      <div className="pointer-events-none fixed inset-0">
+        <div className="absolute inset-0 bg-gradient-to-b from-background via-background/90 to-background" />
+        <div className="absolute right-0 top-0 h-[500px] w-[500px] bg-blue-500/10 blur-[100px]" />
+        <div className="absolute bottom-0 left-0 h-[500px] w-[500px] bg-purple-500/10 blur-[100px]" />
+      </div>
+      <div className="flex flex-col flex-grow relative z-10">
+      <Navbar />
       <main className="container mx-auto px-4 py-12">
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-4xl font-bold">Chess AI Arena</h1>
-          <div className="flex items-center gap-2">
-            <span className="text-lg font-medium">
-              {isLoading ? (
-                <LoadingState />
-              ) : user?.username ? (
-                <span className="text-blue-600">{user.username}</span>
-              ) : (
-                <span className="text-gray-500">Anonymous</span>
-              )}
-            </span>
-          </div>
         </div>
 
         <div className="bg-white rounded-lg shadow p-6">
@@ -732,65 +729,9 @@ export default function ChessCompetition() {
             <MatchResultDisplay {...matchStatus} />
           </div>
         </div>
-
-        {/* Local Leaderboard */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-2xl font-bold">Local Leaderboard</h2>
-            <button
-              onClick={fetchLeaderboard}
-              className="px-3 py-1 text-sm bg-blue-100 text-blue-600 rounded-md hover:bg-blue-200 transition-colors"
-            >
-              Refresh
-            </button>
-          </div>
-          <div className="overflow-x-auto">
-            {isLoading ? (
-              <div className="flex justify-center items-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-              </div>
-            ) : leaderboard.length > 0 ? (
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">Rank</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">Agent</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">Owner</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">Points</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">Wins</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">Draws</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">Losses</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {leaderboard.map((agent, index) => (
-                    <tr key={agent.id} className={publicKey && agent.owner === publicKey.toString() ? 'bg-blue-50' : ''}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-black">{index + 1}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-black">
-                        {agent.name || 'Anonymous'}
-                        {publicKey && agent.owner === publicKey.toString() && (
-                          <span className="ml-2 px-2 py-0.5 text-xs bg-blue-100 text-blue-600 rounded-full">You</span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-black">
-                        {agent.owner.slice(0, 6)}...{agent.owner.slice(-4)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-black">{agent.points}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-medium">{agent.wins}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-yellow-600 font-medium">{agent.draws}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-red-600 font-medium">{agent.losses}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            ) : (
-              <div className="text-center py-8 text-gray-500">
-                No agents found in the leaderboard
-              </div>
-            )}
-          </div>
-        </div>
       </main>
+      <Footer />
+      </div>
     </div>
   )
 }

@@ -14,6 +14,7 @@ import { Navbar } from "@/components/navbar"
 import { fetchUserStats, fetchUser } from "../lib/api"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { UserOnboardingModal } from "@/app/components/user-onboarding-modal"
+import Footer from "@/components/footer"
 
 interface UserStats {
   username: string;
@@ -48,7 +49,7 @@ export default function DashboardPage() {
       try {
         const walletAddress = publicKey.toString();
         console.log("Checking user with wallet:", walletAddress);
-        
+
         const userData = await fetchUser(walletAddress);
         console.log("User data:", userData);
 
@@ -61,7 +62,7 @@ export default function DashboardPage() {
         // Fetch user stats after confirming user exists
         const statsData = await fetchUserStats(walletAddress);
         console.log("User stats:", statsData);
-        
+
         setUserStats({
           ...userData,
           stats: statsData || {
@@ -91,12 +92,12 @@ export default function DashboardPage() {
   useEffect(() => {
     const fetchAgentStats = async () => {
       if (!publicKey) return;
-      
+
       try {
         const response = await fetch(`/api/users/${publicKey.toString()}`);
         if (!response.ok) throw new Error('Failed to fetch agent stats');
         const data = await response.json();
-        
+
         if (data.agent) {
           setAgent({
             ...data.agent,
@@ -150,150 +151,159 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-7xl mx-auto">
-        <Navbar />
-        <div className="container mx-auto px-4 py-8">
-          <div className="flex items-center space-x-4 mb-8">
-            <div className="w-16 h-16 rounded-full bg-blue-500 flex items-center justify-center text-white text-2xl font-bold">
-              {userStats?.username ? userStats.username.charAt(0).toUpperCase() : '?'}
-            </div>
-            <div>
-              <h1 className="text-3xl font-bold">{userStats?.username || 'Anonymous'}</h1>
-              <p className="text-gray-600">{userStats?.walletAddress || 'No wallet connected'}</p>
-              {userStats?.bio && (
-                <p className="text-gray-500 mt-2">{userStats.bio}</p>
-              )}
-            </div>
-          </div>
-          
-          <Tabs defaultValue="overview" className="space-y-6">
-            <TabsList>
-              <TabsTrigger value="overview">Overview</TabsTrigger>
-              <TabsTrigger value="agents">My Agents</TabsTrigger>
-              <TabsTrigger value="activities">Activities</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="overview" className="space-y-6">
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Total Agents</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">{userStats?.stats?.totalAgents ?? 0}</div>
-                    <Bot className="h-4 w-4 text-muted-foreground" />
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Competitions Won</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">{userStats?.stats?.competitionsWon ?? 0}</div>
-                    <Trophy className="h-4 w-4 text-muted-foreground" />
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Tokens Earned</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">{userStats?.stats?.tokensEarned ?? 0}</div>
-                    <Coins className="h-4 w-4 text-muted-foreground" />
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Win Rate</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">{userStats?.stats?.winRate ?? 0}%</div>
-                    <History className="h-4 w-4 text-muted-foreground" />
-                  </CardContent>
-                </Card>
-              </div>
-
-              <div className="grid gap-4 md:grid-cols-2">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Recent Activities</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <ActivityFeed activities={userStats?.activities || []} />
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Top Performing Agents</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <AgentsList 
-                      agents={userStats?.agents 
-                        ? [...userStats.agents].sort((a, b) => (b.matchesWon || 0) - (a.matchesWon || 0)).slice(0, 3)
-                        : []} 
-                    />
-                  </CardContent>
-                </Card>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="agents">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Your Agent Stats</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {!publicKey ? (
-                    <p className="text-center">Please connect your wallet to view your stats</p>
-                  ) : loading ? (
-                    <p className="text-center">Loading...</p>
-                  ) : !agent ? (
-                    <p className="text-center">No agent found. Upload an agent to start competing!</p>
-                  ) : (
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Name</TableHead>
-                          <TableHead className="text-right">Rank</TableHead>
-                          <TableHead className="text-right">Points</TableHead>
-                          <TableHead className="text-right">Wins</TableHead>
-                          <TableHead className="text-right">Draws</TableHead>
-                          <TableHead className="text-right">Losses</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        <TableRow>
-                          <TableCell>{agent.name}</TableCell>
-                          <TableCell className="text-right">#{agent.rank || '-'}</TableCell>
-                          <TableCell className="text-right font-bold text-blue-600">{agent.points || 0}</TableCell>
-                          <TableCell className="text-right text-green-600">{agent.wins || 0}</TableCell>
-                          <TableCell className="text-right text-yellow-600">{agent.draws || 0}</TableCell>
-                          <TableCell className="text-right text-red-600">{agent.losses || 0}</TableCell>
-                        </TableRow>
-                      </TableBody>
-                    </Table>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="activities">
-              <ActivityFeed activities={userStats?.activities || []} />
-            </TabsContent>
-          </Tabs>
-        </div>
+    <div className="min-h-screen bg-background">
+      {/* Background gradients */}
+      <div className="pointer-events-none fixed inset-0">
+        <div className="absolute inset-0 bg-gradient-to-b from-background via-background/90 to-background" />
+        <div className="absolute right-0 top-0 h-[500px] w-[500px] bg-blue-500/10 blur-[100px]" />
+        <div className="absolute bottom-0 left-0 h-[500px] w-[500px] bg-purple-500/10 blur-[100px]" />
       </div>
-      {showOnboarding && isNewUser && (
-        <UserOnboardingModal 
-          isOpen={showOnboarding && isNewUser}
-          onClose={() => setShowOnboarding(false)}
-        />
-      )}
+      <div className="relative z-10">
+        <div className="max-w-auto mx-auto">
+          <Navbar />
+          <div className="container mx-auto px-4 py-8">
+            <div className="flex items-center space-x-4 mb-8">
+              <div className="w-16 h-16 rounded-full bg-blue-500 flex items-center justify-center text-white text-2xl font-bold">
+                {userStats?.username ? userStats.username.charAt(0).toUpperCase() : '?'}
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold">{userStats?.username || 'Anonymous'}</h1>
+                <p className="text-gray-600">{userStats?.walletAddress || 'No wallet connected'}</p>
+                {userStats?.bio && (
+                  <p className="text-gray-500 mt-2">{userStats.bio}</p>
+                )}
+              </div>
+            </div>
+
+            <Tabs defaultValue="overview" className="space-y-6">
+              <TabsList>
+                <TabsTrigger value="overview">Overview</TabsTrigger>
+                <TabsTrigger value="agents">My Agents</TabsTrigger>
+                <TabsTrigger value="activities">Activities</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="overview" className="space-y-6">
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Total Agents</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">{userStats?.stats?.totalAgents ?? 0}</div>
+                      <Bot className="h-4 w-4 text-muted-foreground" />
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Competitions Won</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">{userStats?.stats?.competitionsWon ?? 0}</div>
+                      <Trophy className="h-4 w-4 text-muted-foreground" />
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Tokens Earned</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">{userStats?.stats?.tokensEarned ?? 0}</div>
+                      <Coins className="h-4 w-4 text-muted-foreground" />
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Win Rate</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">{userStats?.stats?.winRate ?? 0}%</div>
+                      <History className="h-4 w-4 text-muted-foreground" />
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Recent Activities</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <ActivityFeed activities={userStats?.activities || []} />
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Top Performing Agents</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <AgentsList
+                        agents={userStats?.agents
+                          ? [...userStats.agents].sort((a, b) => (b.matchesWon || 0) - (a.matchesWon || 0)).slice(0, 3)
+                          : []}
+                      />
+                    </CardContent>
+                  </Card>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="agents">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Your Agent Stats</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {!publicKey ? (
+                      <p className="text-center">Please connect your wallet to view your stats</p>
+                    ) : loading ? (
+                      <p className="text-center">Loading...</p>
+                    ) : !agent ? (
+                      <p className="text-center">No agent found. Upload an agent to start competing!</p>
+                    ) : (
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Name</TableHead>
+                            <TableHead className="text-right">Rank</TableHead>
+                            <TableHead className="text-right">Points</TableHead>
+                            <TableHead className="text-right">Wins</TableHead>
+                            <TableHead className="text-right">Draws</TableHead>
+                            <TableHead className="text-right">Losses</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          <TableRow>
+                            <TableCell>{agent.name}</TableCell>
+                            <TableCell className="text-right">#{agent.rank || '-'}</TableCell>
+                            <TableCell className="text-right font-bold text-blue-600">{agent.points || 0}</TableCell>
+                            <TableCell className="text-right text-green-600">{agent.wins || 0}</TableCell>
+                            <TableCell className="text-right text-yellow-600">{agent.draws || 0}</TableCell>
+                            <TableCell className="text-right text-red-600">{agent.losses || 0}</TableCell>
+                          </TableRow>
+                        </TableBody>
+                      </Table>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="activities">
+                <ActivityFeed activities={userStats?.activities || []} />
+              </TabsContent>
+            </Tabs>
+          </div>
+        </div>
+        {showOnboarding && isNewUser && (
+          <UserOnboardingModal
+            isOpen={showOnboarding && isNewUser}
+            onClose={() => setShowOnboarding(false)}
+          />
+        )}
+        <Footer />
+      </div>
     </div>
   );
 }

@@ -29,7 +29,7 @@ export function UserRegistrationForm() {
     setError(null)
 
     try {
-      const response = await fetch("https://fightscript.onrender.com/api/users", {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/users`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

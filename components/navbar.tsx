@@ -2,15 +2,17 @@
 
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { User, Trophy, ListTodo, Menu, X } from "lucide-react"
+import { User, Trophy, InfoIcon,CpuIcon, FileTerminalIcon, GraduationCapIcon, ListTodo, Menu, X } from "lucide-react"
 import { WalletButton } from "@/app/components/WalletButton"
 import { useWallet } from "@solana/wallet-adapter-react"
 import { useState, useEffect } from "react"
+import { Icon } from "@radix-ui/react-select"
 
 const navigationItems = [
-  { href: "/competitions", label: "Competitions" },
-  { href: "/about", label: "About Us" },
+  { href: "/competitions", label: "Competitions" ,icon: FileTerminalIcon},
   { href: "/leaderboard", label: "Leaderboard", icon: Trophy },
+  { href: "/docs", label: "Docs", icon:GraduationCapIcon},
+  { href: "/about", label: "About Us", icon: InfoIcon }
   // Remove or update any staking-related links
 ]
 
@@ -35,7 +37,7 @@ export function Navbar() {
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-14 max-w-screen-2xl items-center justify-between">
         <Link href="/" className="mr-6 flex items-center space-x-2">
-          <span className="font-bold">Fight Script</span>
+          <CpuIcon></CpuIcon><span className="font-bold">Fight Script</span>
         </Link>
 
         {/* Desktop Navigation */}
@@ -53,16 +55,11 @@ export function Navbar() {
           {publicKey ? (
             <Link href="/dashboard">
               <Button variant="ghost" size="icon">
-                <User className="h-4 w-4" />
+                <User className="h-4 w-auto" />
                 <span className="sr-only">Dashboard</span>
               </Button>
             </Link>
           ) : null}
-          <Link href="https://0xmuon.github.io/co3pe-docs/" target="_blank" rel="noopener noreferrer">
-            <Button variant="ghost" size="sm">
-              Docs
-            </Button>
-          </Link>
           <WalletButton />
           {/* Menu Button */}
           <Button

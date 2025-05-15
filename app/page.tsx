@@ -40,7 +40,7 @@ export default function Home() {
     setIsCheckingUser(true)
     try {
       console.log('Checking user with wallet:', walletAddress)
-      const response = await fetch(`https://fightscript.onrender.com/api/users/${walletAddress}`)
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/users/${walletAddress}`)
       if (!response.ok) {
         throw new Error('User not found')
       }
