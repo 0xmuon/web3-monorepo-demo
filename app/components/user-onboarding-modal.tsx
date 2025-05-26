@@ -12,6 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { proxyRequest } from "@/lib/api"
 
 export type UserOnboardingModalProps = {
   isOpen: boolean;
@@ -32,11 +33,8 @@ export const UserOnboardingModal: React.FC<UserOnboardingModalProps> = ({ isOpen
     setError(null)
 
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/users/`, {
+      await proxyRequest('/users', {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify({
           walletAddress: publicKey.toString(),
           username,
@@ -53,12 +51,9 @@ export const UserOnboardingModal: React.FC<UserOnboardingModalProps> = ({ isOpen
         }),
       })
 
-      if (!response.ok) {
-        throw new Error('Failed to create user')
-      }
-
       onClose()
     } catch (err) {
+      console.error('Error creating user:', err)
       setError(err instanceof Error ? err.message : 'An error occurred')
     } finally {
       setLoading(false)

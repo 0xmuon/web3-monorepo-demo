@@ -9,7 +9,7 @@ import Footer from "@/components/footer"
 import { Suspense } from "react"
 import { LoadingState } from "@/components/ui/loading-state"
 import { useWallet } from "@solana/wallet-adapter-react"
-import { UserOnboardingModal, UserOnboardingModalProps } from "./components/user-onboarding-modal"
+import { UserOnboardingModal } from "./components/user-onboarding-modal"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import Link from "next/link"
 import { toast } from "sonner"
@@ -40,17 +40,14 @@ export default function Home() {
     setIsCheckingUser(true)
     try {
       console.log('Checking user with wallet:', walletAddress)
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/users/${walletAddress}`)
-      if (!response.ok) {
-        throw new Error('User not found')
-      }
+      await fetchUser(walletAddress)
       // If we get here, the user exists
       userCheckCache.set(walletAddress, false)
       setIsNewUser(false)
       setShowOnboarding(false)
     } catch (error) {
       console.error('Error checking user:', error)
-      // If the error is a 404, the user doesn't exist
+      // If the error indicates user not found, show onboarding
       if (error instanceof Error && error.message.includes('not found')) {
         console.log('New user detected, showing onboarding modal')
         userCheckCache.set(walletAddress, true)

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { LoadingState } from "@/components/ui/loading-state"
+import { proxyRequest } from "@/lib/api"
 
 export function UserOnboarding() {
   const { publicKey } = useWallet()
@@ -16,34 +17,43 @@ export function UserOnboarding() {
     bio: "",
     githubHandle: "",
     discordHandle: "",
-    expertise: "beginner"
+    expertise: "beginner",
+    stats: {
+      totalAgents: 0,
+      competitionsWon: 0,
+      tokensEarned: 0,
+      winRate: 0
+    },
+    totalEarnings: 0
   })
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!publicKey) return
+    if (!publicKey) {
+      setError("Wallet not connected")
+      return
+    }
 
     setLoading(true)
     setError(null)
 
     try {
-      const res = await fetch('/api/users', {
+      const requestData = {
+        ...formData,
+        walletAddress: publicKey.toString()
+      }
+      console.log('Submitting user data:', requestData)
+
+      const data = await proxyRequest('/users', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...formData,
-          walletAddress: publicKey.toString()
-        })
+        body: JSON.stringify(requestData)
       })
 
-      if (!res.ok) {
-        throw new Error('Failed to create user profile')
-      }
-
-      // Redirect to home page after successful profile creation
+      console.log('User created successfully:', data)
       window.location.href = '/'
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong')
+      console.error('Error creating user:', err)
+      setError(err instanceof Error ? err.message : 'Failed to create user')
     } finally {
       setLoading(false)
     }

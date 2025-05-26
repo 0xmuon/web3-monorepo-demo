@@ -38,7 +38,7 @@ export async function proxyRequest(path: string, options: RequestInit = {}) {
 export async function fetchUserStats(walletAddress: string) {
   try {
     console.log('Fetching user stats with wallet:', walletAddress);
-    const response = await fetch(`/api/users/${walletAddress}/stats`, {
+    const response = await fetch(`${API_BASE}/users/${walletAddress}/stats`, {
       headers: {
         'Content-Type': 'application/json',
       },
@@ -115,7 +115,7 @@ export async function uploadAgent(file: File, wallet: string) {
 export async function fetchUser(walletAddress: string) {
   try {
     console.log('Fetching user with wallet:', walletAddress);
-    const response = await fetch(`/api/users/${walletAddress}`, {
+    const response = await fetch(`${API_BASE}/users/${walletAddress}`, {
       headers: {
         'Content-Type': 'application/json',
       },

@@ -259,29 +259,52 @@ export default function ChessCompetition() {
   }, [publicKey]);
 
   useEffect(() => {
-    if (publicKey) {
-      fetchUserData();
-      fetchLeaderboard(); // Fetch leaderboard when component mounts
-    } else {
-      setIsLoading(false);
-    }
+    let mounted = true;
+    
+    const init = async () => {
+      if (mounted) {
+        setIsLoading(true);
+        if (publicKey) {
+          await fetchUserData();
+        }
+        await fetchLeaderboard();
+        if (mounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    init();
+
+    return () => {
+      mounted = false;
+    };
   }, [publicKey, fetchUserData]);
 
   const fetchLeaderboard = async () => {
     try {
-      setIsLoading(true);
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/chess/leaderboard`);
+      const baseUrl = window.location.origin;
+      console.log('Fetching leaderboard from:', `${baseUrl}/api/chess/leaderboard`);
+      
+      const response = await fetch(`${baseUrl}/api/chess/leaderboard`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
       if (!response.ok) {
-        throw new Error('Failed to fetch leaderboard');
+        const errorText = await response.text();
+        console.error('Leaderboard error response:', errorText);
+        throw new Error(`Failed to fetch leaderboard: ${errorText}`);
       }
+      
       const data = await response.json();
       console.log('Leaderboard data:', data);
       setLeaderboard(data);
     } catch (error) {
       console.error('Failed to fetch leaderboard:', error);
       toast.error('Failed to fetch leaderboard');
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -336,8 +359,8 @@ export default function ChessCompetition() {
 
       console.log('Uploading file:', uploadState.file.name);
 
-      // Use the direct backend URL
-      const uploadResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/upload/agent`, {
+      // Use the Next.js API route
+      const uploadResponse = await fetch('/api/upload/agent', {
         method: 'POST',
         body: formData,
       });
@@ -355,8 +378,8 @@ export default function ChessCompetition() {
         message: 'Starting match against aggressive bot...'
       });
 
-      // Use the direct backend URL for match creation
-      const matchResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/chess/match`, {
+      // Use the Next.js API route for match creation
+      const matchResponse = await fetch('/api/chess/match', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -383,8 +406,8 @@ export default function ChessCompetition() {
         try {
           console.log(`Polling match status (attempt ${pollCount + 1}/${maxPolls})`);
           
-          // Use the direct backend URL
-          const resultResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/chess/match?matchId=${matchData.matchId}`);
+          // Use the Next.js API route
+          const resultResponse = await fetch(`/api/chess/match?matchId=${matchData.matchId}`);
           
           if (!resultResponse.ok) {
             const errorData = await resultResponse.json();
