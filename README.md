@@ -1,6 +1,9 @@
-# Chess Competition Platform
+# FightScript
 
 This project consists of a Next.js frontend deployed on Vercel and an Express backend deployed on Render.
+
+![image](https://github.com/user-attachments/assets/541996c1-3601-4e3f-a294-b778d64e452c)
+
 
 ## Project Structure
 
@@ -8,6 +11,7 @@ This project consists of a Next.js frontend deployed on Vercel and an Express ba
 - `/server` - Express backend
 
 ## Local Development
+![image](https://github.com/user-attachments/assets/54d0cc8f-556e-498f-b4bb-e94ff428ec2f)
 
 ### Frontend (Next.js)
 
